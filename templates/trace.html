@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Activity Trace</title>
+</head>
+<body>
+
+<h2>Daily Activity Trace</h2>
+
+<table border="1" cellpadding="6">
+    <tr>
+        <th>Date</th>
+        <th>Clock In</th>
+        <th>Clock Out</th>
+        <th>Status</th>
+    </tr>
+
+    {% for t in traces %}
+    <tr>
+        <td>{{ t.date }}</td>
+        <td>{{ t.clock_in }}</td>
+        <td>{{ t.clock_out }}</td>
+        <td>{{ t.status }}</td>
+    </tr>
+    {% endfor %}
+</table>
+
+<br>
+<a href="{{ url_for('dashboard') }}">Back to Dashboard</a>
+
+</body>
+</html>

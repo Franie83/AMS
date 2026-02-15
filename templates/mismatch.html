@@ -1,0 +1,193 @@
+{% extends "layout.html" %}
+{% block body %}
+<div class="row justify-content-center">
+    <div class="col-md-10">
+        <div class="card border-danger shadow-lg">
+            <div class="card-header bg-danger text-white text-center py-4">
+                <div class="display-5 mb-3">🚨</div>
+                <h2>Fraud Prone Activities</h2>
+            </div>
+            <div class="card-body">
+                <!-- NEW FILTER FORM -->
+                <div class="row g-3 mb-4 p-3 bg-light rounded">
+                    <div class="col-md-4">
+                        <input type="text" class="form-control" id="filterName" placeholder="Filter by Employee Name" 
+                               value="{{ request.args.get('name', '') }}">
+                    </div>
+                    <div class="col-md-3">
+                        <input type="date" class="form-control" id="filterDate" value="{{ request.args.get('date', '') }}">
+                    </div>
+                    <div class="col-md-3">
+                        <button class="btn btn-outline-danger w-100" onclick="applyFilters()">🔍 Filter</button>
+                    </div>
+                    <div class="col-md-2">
+                        <a href="{{ url_for('mismatch') }}" class="btn btn-outline-secondary w-100">🔄 Clear</a>
+                    </div>
+                </div>
+
+                <!-- Export PDF Button -->
+                <div class="mb-3">
+                    <button class="btn btn-danger" id="exportPdfBtn">📄 Export to PDF</button>
+                </div>
+
+                <p class="text-center mb-4">Attendance records where captured faces DON'T match registered photos:</p>
+                
+                {% if mismatches and mismatches|length > 0 %}
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead class="table-dark">
+                            <tr>
+                                <th>ID</th>
+                                <th>Employee</th>
+                                <th>👤 Reg Photo</th>
+                                <th>📸 Sign In</th>
+                                <th>📸 Sign Out</th>
+                                <th>Time In</th>
+                                <th>🚨 Face Status</th>
+                                <th>Actions</th> <!-- New Delete Column -->
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for item in mismatches %}
+                            <tr class="{% if item.has_mismatch %}table-danger{% else %}table-success{% endif %}">
+                                <td><strong>{{ item.id }}</strong></td>
+                                <td>{{ item.emp_name }}</td>
+                                <td>
+                                    {% if item.reg_photo %}
+                                        <span class="badge bg-success">✅</span>
+                                        <img src="/uploads/{{ item.reg_photo }}" width="40" height="40" 
+                                             class="rounded ms-1" title="Registered Photo">
+                                    {% else %}
+                                        <span class="badge bg-danger">❌ Missing</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if item.signin_photo %}
+                                        {% if item.reg_signin_match %}
+                                            <span class="badge bg-success">✅ Match</span>
+                                        {% else %}
+                                            <span class="badge bg-danger">❌ No Match</span>
+                                        {% endif %}
+                                        <img src="/uploads/{{ item.signin_photo }}" width="40" height="40" 
+                                             class="rounded ms-1 {{ 'border-danger' if not item.reg_signin_match else '' }}"
+                                             title="{% if item.reg_signin_match %}Sign In Match{% else %}Sign In MISMATCH!{% endif %}">
+                                    {% else %}
+                                        <span class="badge bg-secondary">❌ Missing</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    {% if item.signout_photo %}
+                                        {% if item.reg_signout_match %}
+                                            <span class="badge bg-success">✅ Match</span>
+                                        {% else %}
+                                            <span class="badge bg-danger">❌ No Match</span>
+                                        {% endif %}
+                                        <img src="/uploads/{{ item.signout_photo }}" width="40" height="40" 
+                                             class="rounded ms-1 {{ 'border-danger' if not item.reg_signout_match else '' }}"
+                                             title="{% if item.reg_signout_match %}Sign Out Match{% else %}Sign Out MISMATCH!{% endif %}">
+                                    {% else %}
+                                        <span class="badge bg-secondary">❌ Missing</span>
+                                    {% endif %}
+                                </td>
+                                <td>{{ item.time_in }}</td>
+                                <td>
+                                    {% if not item.reg_photo %}
+                                        <span class="badge bg-danger fs-6">No Reg Photo</span>
+                                    {% elif not item.signin_photo %}
+                                        <span class="badge bg-warning fs-6">No Sign In</span>
+                                    {% elif not item.signout_photo %}
+                                        <span class="badge bg-warning fs-6">No Sign Out</span>
+                                    {% elif not item.reg_signin_match %}
+                                        <span class="badge bg-danger fs-6">🚨 Sign In ≠ Reg</span>
+                                    {% elif not item.reg_signout_match %}
+                                        <span class="badge bg-danger fs-6">🚨 Sign Out ≠ Reg</span>
+                                    {% else %}
+                                        <span class="badge bg-success fs-6">✅ Perfect</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <button class="btn btn-sm btn-outline-danger delete-btn" data-id="{{ item.id }}">Delete</button>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="alert alert-success text-center">
+                    <h4>✅ Perfect Face Matches!</h4>
+                    <p>No face mismatches found.</p>
+                </div>
+                {% endif %}
+
+                <div class="text-center mt-4">
+                    <a href="{{ url_for('timesheet') }}" class="btn btn-outline-primary me-2">📊 Timesheet</a>
+                    <a href="{{ url_for('dashboard') }}" class="btn btn-outline-danger btn-lg px-5">⬅️ Dashboard</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- NEW FILTER SCRIPT -->
+<script>
+function applyFilters() {
+    const name = document.getElementById('filterName').value;
+    const date = document.getElementById('filterDate').value;
+    const params = new URLSearchParams();
+    
+    if (name) params.append('name', name);
+    if (date) params.append('date', date);
+    
+    window.location.href = `{{ url_for('mismatch') }}?${params.toString()}`;
+}
+
+document.getElementById('exportPdfBtn').addEventListener('click', () => {
+    const params = new URLSearchParams(window.location.search);
+    const url = `{{ url_for('export_mismatch_pdf') }}?${params.toString()}`;
+    window.open(url, '_blank');
+});
+
+document.querySelectorAll('.delete-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+        if (!confirm('Delete this mismatch record?')) return;
+        const id = btn.dataset.id;
+        fetch(`/timesheet/mismatch/delete/${id}`, { method: 'POST' })
+            .then(res => res.json())
+            .then(data => {
+                if(data.status === 'ok') {
+                    alert('Record deleted successfully');
+                    location.reload();
+                } else {
+                    alert(`Error: ${data.msg}`);
+                }
+            })
+            .catch(() => alert('Network error'));
+    });
+});
+</script>
+
+<style>
+td img { 
+    cursor: pointer; 
+    transition: transform 0.2s, box-shadow 0.2s; 
+    border: 2px solid #dee2e6; 
+}
+td img:hover { 
+    transform: scale(1.2); 
+    box-shadow: 0 4px 12px rgba(0,123,255,0.4); 
+    z-index: 10; 
+}
+td img.border-danger { 
+    border-color: #dc3545 !important; 
+    animation: pulse 2s infinite; 
+}
+@keyframes pulse {
+    0% { box-shadow: 0 0 0 0 rgba(220, 53, 69, 0.7); }
+    70% { box-shadow: 0 0 0 10px rgba(220, 53, 69, 0); }
+    100% { box-shadow: 0 0 0 0 rgba(220, 53, 69, 0); }
+}
+.table-danger { border-left: 5px solid #dc3545; }
+.table-success { border-left: 5px solid #28a745; }
+</style>
+{% endblock %}

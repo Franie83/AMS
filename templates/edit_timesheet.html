@@ -1,0 +1,41 @@
+{% extends "layout.html" %}
+{% block body %}
+<div class="container mt-4">
+    <h3>Edit Timesheet #{{ ts.id }}</h3>
+    
+    <form method="POST">
+        {{ form.hidden_tag() }}
+        
+        <div class="row mb-3">
+            <div class="col-md-6">
+                <label class="form-label">{{ form.employee_name.label }}</label>
+                {{ form.employee_name(class="form-control", value=ts.employee_name) }}
+            </div>
+            <div class="col-md-6">
+                <label class="form-label">{{ form.mda.label }}</label>
+                {{ form.mda(class="form-control", value=ts.mda) }}
+            </div>
+        </div>
+        
+        <div class="row mb-3">
+            <div class="col-md-4">
+                <label class="form-label">{{ form.date.label }}</label>
+                {{ form.date(class="form-control", value=ts.date.strftime('%Y-%m-%d')) }}
+            </div>
+            <div class="col-md-4">
+                <label class="form-label">{{ form.time_in.label }}</label>
+                {{ form.time_in(class="form-control") }}
+            </div>
+            <div class="col-md-4">
+                <label class="form-label">{{ form.time_out.label }}</label>
+                {{ form.time_out(class="form-control") }}
+            </div>
+        </div>
+        
+        <div class="d-flex gap-2">
+            {{ form.submit(class="btn btn-primary") }}
+            <a href="{{ url_for('timesheet') }}" class="btn btn-secondary">Cancel</a>
+        </div>
+    </form>
+</div>
+{% endblock %}

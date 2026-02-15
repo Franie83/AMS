@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Register Employee</title>
+    <style>
+        * { box-sizing: border-box; }
+        body { 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 20px; 
+            margin: 0;
+            min-height: 100vh;
+        }
+        /* Hide Role label and select */
+        label[for="role"], select#role { display: none; }
+
+        .container {
+            max-width: 500px;
+            margin: 0 auto;
+            background: rgba(255, 255, 255, 0.95);
+            padding: 30px;
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+        }
+        h2 {
+            text-align: center;
+            color: #333;
+            margin-bottom: 30px;
+            font-size: 28px;
+        }
+        label { 
+            font-weight: 600; 
+            color: #555;
+            display: block;
+            margin-bottom: 5px;
+        }
+        input, select { 
+            width: 100%; 
+            padding: 12px 15px; 
+            margin-bottom: 20px; 
+            border: 2px solid #e1e5e9;
+            border-radius: 10px;
+            font-size: 16px;
+            transition: all 0.3s ease;
+        }
+        input:focus, select:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            margin: 5px;
+            width: 100%;
+        }
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3); }
+        .btn-success {
+            background: #28a745;
+            color: white;
+        }
+        .btn-success:hover { background: #218838; transform: translateY(-2px); }
+        .btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+        }
+        .camera-section {
+            display: none;
+            margin: 20px 0;
+        }
+        .camera-container {
+            position: relative;
+            width: 100%;
+            height: 280px;
+            background: #000;
+            border-radius: 15px;
+            overflow: hidden;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+        #registerVideo {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        #registerFaceOverlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+        }
+        #registerSnapshot {
+            max-width: 100%;
+            border-radius: 10px;
+            display: none;
+            margin-top: 10px;
+        }
+        #registerCountdown {
+            font-size: 2.5em;
+            font-weight: bold;
+            color: #28a745;
+            margin: 10px 0;
+            display: none;
+        }
+        #registerStatus {
+            text-align: center;
+            padding: 10px;
+            margin: 15px 0;
+            border-radius: 10px;
+            font-weight: 600;
+        }
+        .status-ready { background: #d4edda; color: #155724; }
+        .status-active { background: #fff3cd; color: #856404; }
+        .status-face { background: #d1ecf1; color: #0c5460; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2>👤 Register Employee</h2>
+        
+        <form method="POST" enctype="multipart/form-data" id="registerForm">
+            <input type="hidden" name="employeeid" value="EMP2025">
+            <input type="hidden" name="status" value="ok">
+            <input type="hidden" name="face_image" id="face_image" required>
+
+            <label for="name">Name</label>
+            <input type="text" id="name" name="name" required>
+
+            <label for="mda">MDA</label>
+            <input type="text" id="mda" name="mda" required>
+
+            <label for="email">Email</label>
+            <input type="email" id="email" name="email" required>
+
+            <label for="phone">Phone</label>
+            <input type="text" id="phone" name="phone" required>
+
+            <label for="role">Role</label>
+            <select id="role" name="role" required>
+                <option value="user" selected>User (Default)</option>
+                <option value="admin">Admin</option>
+            </select>
+
+            <!-- AUTO-CAPTURE CAMERA SECTION (EXACT SAME LOGIC) -->
+            <div id="registerCameraSection" class="camera-section">
+                <label class="form-label">📸 Face Detection (Auto-capture in 3s)</label>
+                <div class="camera-container">
+                    <video id="registerVideo" autoplay muted></video>
+                    <canvas id="registerFaceOverlay"></canvas>
+                </div>
+                <canvas id="registerCanvas" style="display:none;"></canvas>
+                <div id="registerCountdown">3</div>
+                <img id="registerSnapshot" alt="Captured Face">
+            </div>
+
+            <div id="registerStatus" class="status-ready">Fill all fields to activate camera.</div>
+
+            <div style="display: flex; flex-direction: column; gap: 10px; align-items: center;">
+                <button type="submit" class="btn btn-primary" id="submitBtn" disabled>Register Employee</button>
+                <button type="button" class="btn btn-secondary" onclick="window.location.href='/employees'">🏠 Back to Employees</button>
+            </div>
+        </form>
+    </div>
+
+    <script>
+        let registerStream = null;
+        let registerCountdownTimer = null;
+        let registerFaceDetected = false;
+
+        const registerForm = document.getElementById('registerForm');
+        const registerStatus = document.getElementById('registerStatus');
+        const registerCameraSection = document.getElementById('registerCameraSection');
+        const registerVideo = document.getElementById('registerVideo');
+        const registerFaceOverlay = document.getElementById('registerFaceOverlay');
+        const registerCountdown = document.getElementById('registerCountdown');
+        const registerSnapshot = document.getElementById('registerSnapshot');
+        const registerCanvas = document.getElementById('registerCanvas');
+        const submitBtn = document.getElementById('submitBtn');
+        const faceImageInput = document.getElementById('face_image');
+
+        // Check if all fields filled
+        function areAllFieldsFilled() {
+            const fields = ['name', 'mda', 'email', 'phone'];
+            for (let id of fields) {
+                if (document.getElementById(id).value.trim() === '') return false;
+            }
+            return true;
+        }
+
+        // Update status
+        function updateStatus(message, className = 'ready') {
+            registerStatus.textContent = message;
+            registerStatus.className = `status-${className}`;
+        }
+
+        // Watch form fields
+        const inputs = document.querySelectorAll('#registerForm input, #registerForm select');
+        inputs.forEach(input => {
+            input.addEventListener('input', () => {
+                if (areAllFieldsFilled() && !registerStream) {
+                    updateStatus("✅ All fields complete! Starting camera...", 'active');
+                    setTimeout(startRegisterCamera, 500);
+                } else if (!areAllFieldsFilled() && registerStream) {
+                    stopRegisterCamera();
+                }
+            });
+        });
+
+        // START CAMERA (EXACT SAME LOGIC)
+        function startRegisterCamera() {
+            registerCameraSection.style.display = 'block';
+            navigator.mediaDevices.getUserMedia({ 
+                video: { width: 640, height: 480, facingMode: 'user' } 
+            })
+            .then(stream => {
+                registerStream = stream;
+                registerVideo.srcObject = stream;
+                registerVideo.onloadedmetadata = () => {
+                    startRegisterFaceDetection();
+                };
+            })
+            .catch(err => {
+                updateStatus("Camera access denied: " + err.message, 'ready');
+            });
+        }
+
+        // STOP CAMERA
+        function stopRegisterCamera() {
+            registerCameraSection.style.display = 'none';
+            if (registerStream) {
+                registerStream.getTracks().forEach(track => track.stop());
+                registerStream = null;
+            }
+            registerFaceDetected = false;
+            if (registerCountdownTimer) clearInterval(registerCountdownTimer);
+            registerSnapshot.style.display = 'none';
+            submitBtn.disabled = true;
+            faceImageInput.value = '';
+        }
+
+        // FACE DETECTION (EXACT SAME LOGIC)
+        function startRegisterFaceDetection() {
+            const detectFaces = () => {
+                const ctx = registerFaceOverlay.getContext('2d');
+                ctx.clearRect(0, 0, registerFaceOverlay.width, registerFaceOverlay.height);
+                
+                const rect = registerVideo.getBoundingClientRect();
+                registerFaceOverlay.width = rect.width;
+                registerFaceOverlay.height = rect.height;
+                
+                // PERFECT CENTERED CIRCLE (EXACT SAME)
+                const radius = Math.min(rect.width, rect.height) / 3;
+                ctx.beginPath();
+                ctx.arc(rect.width/2, rect.height/2, radius, 0, 2 * Math.PI);
+                ctx.strokeStyle = registerFaceDetected ? '#00ff00' : '#ff4444';
+                ctx.lineWidth = 6;
+                ctx.shadowColor = registerFaceDetected ? '#00ff00' : '#ff4444';
+                ctx.shadowBlur = 20;
+                ctx.stroke();
+                
+                // Face detection (center brightness - EXACT SAME)
+                const canvasTemp = document.createElement('canvas');
+                canvasTemp.width = 100; canvasTemp.height = 100;
+                const tempCtx = canvasTemp.getContext('2d');
+                tempCtx.drawImage(registerVideo, rect.width/2-50, rect.height/2-50, 100, 100, 0, 0, 100, 100);
+                
+                const imageData = tempCtx.getImageData(0, 0, 100, 100);
+                let brightness = 0;
+                for (let i = 0; i < imageData.data.length; i += 4) {
+                    brightness += imageData.data[i] + imageData.data[i+1] + imageData.data[i+2];
+                }
+                brightness /= (imageData.data.length / 4 * 3);
+                
+                registerFaceDetected = brightness > 80 && brightness < 180;
+                
+                if (registerFaceDetected) startRegisterCountdown();
+                requestAnimationFrame(detectFaces);
+            };
+            detectFaces();
+        }
+
+        // COUNTDOWN (EXACT SAME)
+        function startRegisterCountdown() {
+            if (registerCountdownTimer) clearInterval(registerCountdownTimer);
+            let count = 3;
+            registerCountdown.style.display = 'block';
+            registerCountdownTimer = setInterval(() => {
+                count--;
+                registerCountdown.textContent = count;
+                if (count <= 0) {
+                    clearInterval(registerCountdownTimer);
+                    registerAutoSnap();
+                }
+            }, 1000);
+        }
+
+        // AUTO SNAP (EXACT SAME)
+        function registerAutoSnap() {
+            registerCanvas.width = registerVideo.videoWidth;
+            registerCanvas.height = registerVideo.videoHeight;
+            registerCanvas.getContext('2d').drawImage(registerVideo, 0, 0);
+            const imageData = registerCanvas.toDataURL('image/png', 0.9);
+            faceImageInput.value = imageData;
+            registerSnapshot.src = imageData;
+            registerSnapshot.style.display = 'block';
+            submitBtn.disabled = false;
+            submitBtn.style.display = 'block';
+        }
+
+        // FORM SUBMIT
+        registerForm.onsubmit = function(e) {
+            e.preventDefault();
+            if (!faceImageInput.value) {
+                alert('Please wait for auto-capture!');
+                return false;
+            }
+            this.submit();
+        };
+
+        // CLEANUP
+        window.onbeforeunload = () => stopRegisterCamera();
+    </script>
+</body>
+</html>

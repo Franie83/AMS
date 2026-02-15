@@ -1,0 +1,53 @@
+{% extends "layout.html" %}
+{% block body %}
+<h3>Timesheet</h3>
+
+<form method="get" class="row g-2 mb-3">
+  <div class="col"><input name="name" class="form-control" placeholder="Name" value="{{ request.args.get('name','') }}"></div>
+  <div class="col"><input name="mda" class="form-control" placeholder="MDA" value="{{ request.args.get('mda','') }}"></div>
+  <div class="col"><input name="employeeid" class="form-control" placeholder="Employee ID" value="{{ request.args.get('employeeid','') }}"></div>
+  <div class="col"><input name="date_from" class="form-control" type="date" value="{{ request.args.get('date_from','') }}"></div>
+  <div class="col"><input name="date_to" class="form-control" type="date" value="{{ request.args.get('date_to','') }}"></div>
+  <div class="col-auto"><button class="btn btn-outline-primary">Filter</button></div>
+</form>
+
+<div class="mb-2">
+  <a class="btn btn-success" href="{{ url_for('export_excel') }}">Export Excel</a>
+  <a class="btn btn-secondary" href="{{ url_for('export_pdf') }}">Export PDF</a>
+  <a class="btn btn-warning" href="{{ url_for('mismatch') }}">Find Mismatches</a>
+</div>
+
+<table class="table table-sm table-bordered">
+  <thead><tr><th>Name</th><th>MDA</th><th>Date</th><th>Time In</th><th>Time Out</th><th>Images</th><th>Action</th></tr></thead>
+  <tbody>
+  {% for t in times %}
+    <tr>
+      <td>{{ t.employee_name }}</td>
+      <td>{{ t.mda }}</td>
+      <td>{{ t.date }}</td>
+      <td>{{ t.time_in or '' }}</td>
+      <td>{{ t.time_out or '' }}</td>
+      <td>
+        {% if t.registered_image %}<img height="40" src="{{ url_for('uploads', filename=t.registered_image.split('/')[-1]) }}">{% endif %}
+        {% if t.signin_image %}<img height="40" src="{{ url_for('uploads', filename=t.signin_image.split('/')[-1]) }}">{% endif %}
+        {% if t.signout_image %}<img height="40" src="{{ url_for('uploads', filename=t.signout_image.split('/')[-1]) }}">{% endif %}
+      </td>
+      <td>
+        <a class="btn btn-sm btn-primary" href="{{ url_for('edit_timesheet', id=t.id) }}">Edit</a>
+        <button class="btn btn-sm btn-danger" onclick="del({{ t.id }})">Delete</button>
+      </td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+
+<script>
+async function del(id){
+  if (!confirm('Delete?')) return;
+  const res = await fetch('/timesheet/delete/'+id, {method:'POST'});
+  const j = await res.json();
+  if (j.status==='ok') location.reload();
+  else alert(j.msg || 'error');
+}
+</script>
+{% endblock %}

@@ -1,0 +1,23 @@
+{% extends "layout.html" %}
+{% block body %}
+<h3>Dashboard - Attendance Insights</h3>
+<table class="table table-sm">
+  <thead><tr><th>Employee</th><th>MDA</th><th>Signed In</th><th>Signed Out</th><th>No Signout</th><th>Late</th><th>Early</th><th>Left Before</th><th>Stayed Till Close</th><th>Trace</th></tr></thead>
+  <tbody>
+    {% for s in stats %}
+      <tr>
+        <td>{{ s.employee_name }}</td>
+        <td>{{ s.mda }}</td>
+        <td>{{ s.signed_in_count }}</td>
+        <td>{{ s.signed_out_count }}</td>
+        <td>{{ s.signed_in_no_signout }}</td>
+        <td>{{ s.late_count }}</td>
+        <td>{{ s.early_count }}</td>
+        <td>{{ s.left_before_time }}</td>
+        <td>{{ s.waited_till_closing }}</td>
+        <td><a href="{{ s.trace_link }}" class="btn btn-sm btn-outline-primary">Trace</a></td>
+      </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

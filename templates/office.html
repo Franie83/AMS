@@ -1,0 +1,142 @@
+{% extends "layout.html" %}
+{% block body %}
+<div class="row g-4">
+    <div class="col-12">
+        <div class="card shadow">
+            <div class="card-header bg-primary text-white">
+                <h3 class="card-title mb-0">
+                    <i class="fas fa-building me-2"></i>[translate:Office Today]
+                </h3>
+                <span class="badge bg-light text-dark fs-6 ms-2">{{ employees|length }} [translate:Currently In]</span>
+            </div>
+            <div class="card-body">
+                {% if employees %}
+                    {% for emp in employees %}
+                    <div class="row mb-3 p-3 border rounded bg-light" id="emp-row-{{ emp.id }}">
+                        <div class="col-md-2 text-center">
+                            <div class="avatar">
+                                {% if emp.registered_image %}
+                                <img height="60" src="{{ url_for('uploads', filename=emp.registered_image.split('/')[-1]) }}" class="rounded-circle shadow-sm" alt="[translate:Registered Photo]">
+                                {% else %}
+                                <div class="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center" style="width:60px;height:60px;font-size:1.2rem;">
+                                    {{ emp.employee_name.split(' ')[0][0] }}
+                                </div>
+                                {% endif %}
+                            </div>
+                            <small class="text-muted mt-1 d-block">{{ emp.employee_name.split(' ')[0] }}</small>
+                        </div>
+                        <div class="col-md-3">
+                            <strong>{{ emp.employee_name }}</strong><br>
+                            <small class="text-muted">{{ emp.mda or '[translate:N/A]' }}</small>
+                        </div>
+                        <div class="col-md-2">
+                            <strong>[translate:Sign In]</strong><br>
+                            <span class="badge bg-success">{{ emp.time_in.strftime('%H:%M') if emp.time_in else '-' }}</span>
+                        </div>
+                        <div class="col-md-2">
+                            <strong>[translate:Sign Out]</strong><br>
+                            <span class="badge bg-warning text-dark">⏳ [translate:Pending]</span>
+                        </div>
+                        <div class="col-md-2">
+                            <div>
+                                {% if emp.registered_image %}
+                                <img height="30" class="me-1" src="{{ url_for('uploads', filename=emp.registered_image.split('/')[-1]) }}" alt="[translate:Registered Photo]">
+                                {% endif %}
+                                {% if emp.signin_image %}
+                                <img height="30" src="{{ url_for('uploads', filename=emp.signin_image.split('/')[-1]) }}" alt="[translate:Sign In Photo]">
+                                {% endif %}
+                            </div>
+                        </div>
+                        <div class="col-md-1 text-center">
+                            <button class="btn btn-sm btn-outline-danger delete-office-btn" 
+                                    data-id="{{ emp.id }}"
+                                    data-name="{{ emp.employee_name }}">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </div>
+                    </div>
+                    {% endfor %}
+                {% else %}
+                    <div class="text-center py-5">
+                        <i class="fas fa-building fa-4x text-muted mb-4"></i>
+                        <h4 class="text-muted">[translate:Office is Empty]</h4>
+                        <p class="text-muted">[translate:No employees currently signed in]</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ✅ DELETE MODAL (one at bottom) -->
+<div class="modal fade" id="deleteModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title text-danger"><i class="fas fa-trash me-2"></i>[translate:Confirm Delete]</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="[translate:Close]"></button>
+            </div>
+            <div class="modal-body">
+                <p>[translate:Remove] <strong id="deleteEmpName"></strong> [translate:from office?]</p>
+                <p class="text-muted small">[translate:This deletes today's attendance record.]</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">[translate:Cancel]</button>
+                <button type="button" class="btn btn-danger" id="confirmDeleteBtn">
+                    <i class="fas fa-trash me-1"></i>[translate:Remove]
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const deleteBtns = document.querySelectorAll('.delete-office-btn');
+    const modal = new bootstrap.Modal(document.getElementById('deleteModal'));
+    const empNameEl = document.getElementById('deleteEmpName');
+    const confirmBtn = document.getElementById('confirmDeleteBtn');
+    let currentId = null;
+
+    // Set modal data on button click
+    deleteBtns.forEach(btn => {
+        btn.addEventListener('click', function() {
+            currentId = this.dataset.id;
+            empNameEl.textContent = this.dataset.name;
+            modal.show();
+        });
+    });
+
+    // Handle delete confirmation
+    confirmBtn.addEventListener('click', function() {
+        if (!currentId) return;
+
+        fetch(`/office/delete/${currentId}`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'}
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.status === 'ok') {
+                const row = document.getElementById(`emp-row-${currentId}`);
+                row.style.transition = 'opacity 0.3s';
+                row.style.opacity = '0';
+                setTimeout(() => {
+                    row.remove();
+                    const badge = document.querySelector('.badge');
+                    let count = parseInt(badge.textContent);
+                    badge.textContent = (count - 1) + (count > 1 ? ' [translate:Currently In]' : ' [translate:Currently In]');
+                }, 300);
+                modal.hide();
+            } else {
+                alert(data.msg || '[translate:Error occurred]');
+            }
+        })
+        .catch(err => {
+            alert('[translate:Network error]');
+            console.error(err);
+        });
+    });
+});
+</script>
+{% endblock %}

@@ -1,0 +1,108 @@
+{% extends "layout.html" %}
+{% block body %}
+<h3>Register Employee</h3>
+<div class="row">
+  <div class="col-md-6">
+    <form id="regForm">
+      <div class="mb-2"><label>Name</label><input id="name" class="form-control" name="name" required></div>
+      <div class="mb-2"><label>MDA</label><input id="mda" class="form-control" name="mda" required></div>
+      <div class="mb-2"><label>Email</label><input id="email" class="form-control" name="email"></div>
+      <div class="mb-2"><label>Phone</label><input id="phone" class="form-control" name="phone"></div>
+      <div class="mb-2"><label>Role</label>
+        <select id="role" name="role" class="form-control">
+          <option value="user">user</option>
+          <option value="admin">admin</option>
+        </select>
+      </div>
+      <input type="hidden" id="captured_image" name="captured_image">
+      <button id="startCam" type="button" class="btn btn-outline-primary">Start Camera (will auto-capture)</button>
+      <button id="submitBtn" type="button" class="btn btn-success" disabled>Register</button>
+    </form>
+  </div>
+  <div class="col-md-6">
+    <video id="video" class="camera" autoplay muted></video>
+    <canvas id="canvas" width="480" height="360" style="display:none;"></canvas>
+    <div id="empidBox" class="mt-2"></div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+<!-- face-api CDN -->
+<script defer src="https://cdn.jsdelivr.net/npm/face-api.js/dist/face-api.min.js"></script>
+
+<script>
+let video = document.getElementById('video');
+let canvas = document.getElementById('canvas');
+let ctx = canvas.getContext('2d');
+let startBtn = document.getElementById('startCam');
+let submitBtn = document.getElementById('submitBtn');
+let captured_image = document.getElementById('captured_image');
+
+// Load face-api models from CDN or local static/models directory.
+// Here we try CDN-hosted models (you can also serve from /static/models)
+Promise.all([
+  faceapi.nets.tinyFaceDetector.loadFromUri('https://justadomain.example/models') // placeholder for self-hosted models
+]).catch(()=>{ console.log('face-api models may not be loaded; auto-capture will attempt once anyway.'); });
+
+startBtn.onclick = async ()=>{
+  // require fields filled
+  if (!document.getElementById('name').value || !document.getElementById('mda').value) {
+    alert("Please fill Name and MDA before starting camera.");
+    return;
+  }
+  // start camera
+  const stream = await navigator.mediaDevices.getUserMedia({video:true});
+  video.srcObject = stream;
+  submitBtn.disabled = true;
+
+  // attempt to detect face every 800ms and capture once detected
+  const interval = setInterval(async ()=>{
+    ctx.drawImage(video,0,0, canvas.width, canvas.height);
+    // naive approach: send frame to face-api detect locally if models loaded
+    let detected = false;
+    if (faceapi && faceapi.nets && faceapi.nets.tinyFaceDetector.params) {
+      try {
+        const detections = await faceapi.detectAllFaces(video, new faceapi.TinyFaceDetectorOptions());
+        if (detections && detections.length>0) detected = true;
+      } catch(e){ /* ignore */ }
+    } else {
+      // fallback heuristic: assume camera on, capture immediately after 2 secs
+      // (Better to use server-side detection if you can't load models)
+      detected = true;
+    }
+    if (detected) {
+      clearInterval(interval);
+      // capture and set hidden input
+      ctx.drawImage(video,0,0, canvas.width, canvas.height);
+      const data = canvas.toDataURL('image/png');
+      captured_image.value = data;
+      document.getElementById('submitBtn').disabled = false;
+      // stop video tracks
+      stream.getTracks().forEach(t=>t.stop());
+      video.srcObject = null;
+      alert('Face captured. Click Register submit to complete registration.');
+    }
+  }, 800);
+};
+
+submitBtn.onclick = async ()=>{
+  const form = document.getElementById('regForm');
+  if (!captured_image.value) {
+    alert("No captured image. Start camera and capture first.");
+    return;
+  }
+  const payload = new FormData(form);
+  const res = await fetch('', {method:'POST', body: payload});
+  const data = await res.json();
+  if (data.status === 'ok') {
+    document.getElementById('empidBox').innerHTML = `<div class="alert alert-success">Employee created with ID: <strong>${data.employeeid}</strong>. Note this ID for attendance.</div>`;
+    // clear form
+    form.reset();
+    captured_image.value = '';
+    submitBtn.disabled = true;
+  } else {
+    alert("Error registering");
+  }
+};
+</script>
+{% endblock %}

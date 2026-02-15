@@ -1,0 +1,39 @@
+{% extends "layout.html" %}
+{% block body %}
+<h3>Employees</h3>
+<form method="get" class="row g-2 mb-3">
+  <div class="col"><input name="name" class="form-control" placeholder="Name" value="{{ request.args.get('name','') }}"></div>
+  <div class="col"><input name="mda" class="form-control" placeholder="MDA" value="{{ request.args.get('mda','') }}"></div>
+  <div class="col"><input name="employeeid" class="form-control" placeholder="Employee ID" value="{{ request.args.get('employeeid','') }}"></div>
+  <div class="col-auto"><button class="btn btn-outline-primary">Filter</button></div>
+</form>
+<table class="table table-sm table-bordered">
+  <thead><tr><th>EmpID</th><th>Name</th><th>MDA</th><th>Phone</th><th>Role</th><th>Registered Image</th><th>Actions</th></tr></thead>
+  <tbody>
+    {% for e in employees %}
+    <tr>
+      <td>{{ e.employeeid }}</td>
+      <td>{{ e.name }}</td>
+      <td>{{ e.mda }}</td>
+      <td>{{ e.phone }}</td>
+      <td>{{ e.role }}</td>
+      <td>{% if e.registered_image %}<img src="{{ url_for('uploads', filename=e.registered_image.split('/')[-1]) }}" height="50">{% endif %}</td>
+      <td>
+        <a class="btn btn-sm btn-primary" href="{{ url_for('edit_employee', id=e.id) }}">Edit</a>
+        <button class="btn btn-sm btn-danger" onclick="deleteEmp({{ e.id }})">Delete</button>
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+<script>
+async function deleteEmp(id){
+  if (!confirm('Delete?')) return;
+  const res = await fetch('/employees/delete/'+id, {method:'POST'});
+  const j = await res.json();
+  if (j.status==='ok') location.reload();
+  else alert(j.msg || 'error');
+}
+</script>
+{% endblock %}

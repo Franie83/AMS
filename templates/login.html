@@ -1,0 +1,51 @@
+{% extends "layout.html" %}
+{% block body %}
+<div class="row justify-content-center">
+    <div class="col-md-6 col-lg-4">
+        <div class="card shadow">
+            <div class="card-body p-4">
+                <h3 class="text-center mb-4">👤 Login</h3>
+                
+                {% with messages = get_flashed_messages(with_categories=true) %}
+                    {% if messages %}
+                        {% for category, message in messages %}
+                            <div class="alert alert-{{ 'danger' if category == 'danger' else category }} alert-dismissible fade show" role="alert">
+                                {{ message }}
+                                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                            </div>
+                        {% endfor %}
+                    {% endif %}
+                {% endwith %}
+                
+                <form method="POST">
+                    <div class="mb-3">
+                        <label class="form-label">Employee Email</label>
+                        <input class="form-control" name="email" placeholder="employee@company.com" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Phone Number (Password)</label>
+                        <input class="form-control" type="password" name="phone" placeholder="08012345678" required>
+                    </div>
+                    <button class="btn btn-primary w-100">Login</button>
+                </form>
+                
+                <hr>
+                <div class="text-center">
+                    <!-- Role-based dashboard info -->
+                    {% if current_user.is_authenticated %}
+                        {% if current_user.role == 'user' %}
+                            <small class="text-success">
+                                👤 User role: Register + Take Attendance only
+                            </small>
+                        {% elif current_user.role == 'admin' %}
+                            <small class="text-primary">
+                                👑 Admin: Full access to all features
+                            </small>
+                        {% endif %}
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

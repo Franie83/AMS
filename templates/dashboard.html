@@ -1,0 +1,102 @@
+{% extends "layout.html" %}
+{% block body %}
+<div class="container mt-4">
+    <h3>📊 Dashboard - Attendance Insights</h3>
+    
+    <!-- Stacked Bar Chart WITH TOTALS -->
+    <div class="card shadow-sm p-3">
+        <div style="position: relative; height: 400px;">
+            <canvas id="attendanceChart"></canvas>
+        </div>
+    </div>
+</div>
+
+<!-- Chart.js and DataLabels Plugin CDN -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2"></script>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const ctx = document.getElementById('attendanceChart').getContext('2d');
+
+    const labels = {{ stats|map(attribute='employee_name')|list|tojson }};
+    const signedInData = {{ stats|map(attribute='signed_in_count')|list|tojson }};
+    const signedOutData = {{ stats|map(attribute='signed_out_count')|list|tojson }};
+    const noSignoutData = {{ stats|map(attribute='signed_in_no_signout')|list|tojson }};
+    const lateData = {{ stats|map(attribute='late_count')|list|tojson }};
+
+    new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: labels,
+            datasets: [
+                {
+                    label: 'Signed In',
+                    data: signedInData,
+                    backgroundColor: '#28a745',
+                    stack: 'attendance'
+                },
+                {
+                    label: 'Signed Out',
+                    data: signedOutData,
+                    backgroundColor: '#007bff',
+                    stack: 'attendance'
+                },
+                {
+                    label: 'No Signout',
+                    data: noSignoutData,
+                    backgroundColor: '#ffc107',
+                    stack: 'attendance'
+                },
+                {
+                    label: 'Late',
+                    data: lateData,
+                    backgroundColor: '#dc3545',
+                    stack: 'attendance'
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { position: 'top' },
+                datalabels: {
+                    color: '#000',
+                    font: { weight: 'bold' },
+                    formatter: function(value, context) {
+                        // Sum all stacks for this bar to show total on top
+                        let sum = 0;
+                        const datasets = context.chart.data.datasets;
+                        for (let i = 0; i < datasets.length; i++) {
+                            sum += datasets[i].data[context.dataIndex];
+                        }
+                        // Show sum only for last dataset's label
+                        if (context.datasetIndex === datasets.length - 1) {
+                            return 'Total: ' + sum;
+                        } else {
+                            return '';
+                        }
+                    },
+                    anchor: 'end',
+                    align: 'start',
+                    offset: -10
+                }
+            },
+            scales: {
+                x: {
+                    stacked: true,
+                    ticks: { maxRotation: 45 }
+                },
+                y: {
+                    stacked: true,
+                    beginAtZero: true,
+                    ticks: { stepSize: 1 }
+                }
+            }
+        },
+        plugins: [ChartDataLabels]
+    });
+});
+</script>
+{% endblock %}

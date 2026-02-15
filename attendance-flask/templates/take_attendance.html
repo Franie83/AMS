@@ -1,0 +1,52 @@
+{% extends "layout.html" %}
+{% block body %}
+<h3>Take Attendance</h3>
+<div class="row">
+  <div class="col-md-5">
+    <div class="mb-2"><label>Employee ID</label><input id="employeeid" class="form-control"></div>
+    <button id="start" class="btn btn-primary">Validate & Start Camera</button>
+    <div id="resultBox" class="mt-2"></div>
+  </div>
+  <div class="col-md-7">
+    <video id="video" class="camera" autoplay muted></video>
+    <canvas id="canvas" width="480" height="360" style="display:none;"></canvas>
+  </div>
+</div>
+
+<script>
+let video = document.getElementById('video');
+let canvas = document.getElementById('canvas');
+let ctx = canvas.getContext('2d');
+
+document.getElementById('start').onclick = async ()=>{
+  const empid = document.getElementById('employeeid').value.trim();
+  if (!empid) { alert('Enter employeeid'); return; }
+  // check employee exists (optional server call)
+  const r = await fetch('/take_attendance', {method:'POST', body: new URLSearchParams({employeeid: empid, captured_image: ''})});
+  // We will not send empty capture; we'll use dedicated validation endpoint by hitting GET
+  // Instead, do a quick check by pinging /employees?employeeid=...
+  const res = await fetch(`/employees?employeeid=${encodeURIComponent(empid)}`);
+  // if page returns, we assume exists. Simpler: rely on server when posting.
+  const stream = await navigator.mediaDevices.getUserMedia({video:true});
+  video.srcObject = stream;
+  // capture frame and post to server when ready (here: capture immediately after 1s)
+  setTimeout(async ()=>{
+    ctx.drawImage(video,0,0, canvas.width, canvas.height);
+    const data = canvas.toDataURL('image/png');
+    // post
+    const form = new URLSearchParams();
+    form.append('employeeid', empid);
+    form.append('captured_image', data);
+    const post = await fetch('/take_attendance', {method:'POST', body: form});
+    const j = await post.json();
+    if (j.status === 'ok') {
+      document.getElementById('resultBox').innerHTML = `<div class="alert alert-success">Attendance action: ${j.action}</div>`;
+    } else {
+      document.getElementById('resultBox').innerHTML = `<div class="alert alert-danger">${j.msg || 'error'}</div>`;
+    }
+    stream.getTracks().forEach(t=>t.stop());
+    video.srcObject = null;
+  }, 1000);
+};
+</script>
+{% endblock %}
