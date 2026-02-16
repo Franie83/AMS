@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EdoVoice - Report Issues, Get Solutions</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="manifest" href="{{ url_for('static', filename='manifest.json') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🗣️</text></svg>">
+    <meta name="theme-color" content="#2563eb">
+</head>
+<body class="bg-gradient-to-br from-blue-50 to-indigo-100 min-h-screen">
+    <!-- Mobile Menu Button -->
+    <button id="mobile-menu-btn" class="md:hidden fixed top-4 right-4 z-50 bg-blue-600 text-white p-3 rounded-full shadow-lg">
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
+        </svg>
+    </button>
+
+    <!-- Navigation -->
+    <nav class="bg-white/80 backdrop-blur-md shadow-xl border-b border-blue-100 sticky top-0 z-40">
+        <div class="container mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between items-center py-4">
+                <!-- Logo -->
+                <a href="{% if session.user_phone %}{{ url_for('dashboard') }}{% else %}{{ url_for('register') }}{% endif %}" class="flex items-center space-x-3">
+                    <div class="w-12 h-12 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-2xl flex items-center justify-center shadow-lg">
+                        <span class="text-2xl">🗣️</span>
+                    </div>
+                    <div>
+                        <h1 class="text-2xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">EdoVoice</h1>
+                        <p class="text-xs text-gray-500 font-medium">Video-First Reporting</p>
+                    </div>
+                </a>
+
+                <!-- Desktop Navigation -->
+                <div class="hidden md:flex items-center space-x-4">
+                    {% if session.user_phone %}
+                        {% if session.user_role in ['SuperAdmin', 'Admin'] %}
+                            <a href="{{ url_for('users') }}" class="px-4 py-2 text-sm font-medium text-blue-700 bg-blue-100 rounded-xl hover:bg-blue-200 transition">👥 Users</a>
+                        {% endif %}
+                        <a href="{{ url_for('dashboard') }}" class="px-4 py-2 text-sm font-medium text-gray-700 hover:text-blue-600 rounded-xl hover:bg-blue-50 transition">📊 Dashboard</a>
+                        <a href="{{ url_for('new_report') }}" class="px-4 py-2 text-sm font-medium text-white bg-gradient-to-r from-emerald-500 to-green-600 rounded-xl hover:from-emerald-600 hover:to-green-700 shadow-lg transition-all transform hover:scale-105">➕ New Report</a>
+                        
+                        <!-- User Profile -->
+                        <div class="flex items-center space-x-3 p-2 bg-gray-100 rounded-xl">
+                            <div class="w-10 h-10 bg-gradient-to-r 
+                                {% if session.user_role == 'SuperAdmin' %}from-purple-500 to-purple-600
+                                {% elif session.user_role == 'Admin' %}from-blue-500 to-blue-600
+                                {% else %}from-gray-500 to-gray-600{% endif %}
+                                rounded-xl flex items-center justify-center text-white font-bold text-sm shadow-md">
+                                {{ session.user_name[0]|upper if session.user_name else 'U' }}
+                            </div>
+                            <div class="hidden sm:block">
+                                <div class="font-semibold text-gray-900 text-sm truncate max-w-[150px]">
+                                    {{ session.get('user_name', 'User') }}
+                                </div>
+                                <div class="text-xs text-gray-500 font-medium">
+                                    {{ session.get('user_role', 'User') }}
+                                </div>
+                            </div>
+                            <a href="{{ url_for('logout') }}" class="ml-2 bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-xl text-sm font-semibold shadow-md hover:shadow-lg transition-all transform hover:scale-105 whitespace-nowrap">Logout</a>
+                        </div>
+                    {% else %}
+                        <!-- Guest: Sign Up + Login Buttons -->
+                        <div class="flex items-center space-x-3">
+                            <a href="{{ url_for('register') }}" class="px-6 py-3 bg-gradient-to-r from-emerald-500 to-green-600 text-white font-semibold rounded-xl shadow-lg hover:shadow-xl hover:from-emerald-600 hover:to-green-700 transition-all transform hover:scale-105 whitespace-nowrap">
+                                👤 Sign Up
+                            </a>
+                            <a href="{{ url_for('login') }}" class="px-6 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-semibold rounded-xl shadow-lg hover:shadow-xl hover:from-blue-700 hover:to-indigo-700 transition-all transform hover:scale-105 whitespace-nowrap">
+                                🚀 Sign In
+                            </a>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Mobile Menu Overlay -->
+    <div id="mobile-menu" class="md:hidden fixed inset-0 bg-black bg-opacity-50 z-40 hidden"></div>
+    <div id="mobile-nav" class="md:hidden fixed right-0 top-0 h-full w-80 bg-white shadow-2xl transform translate-x-full transition-transform duration-300 z-50">
+        <div class="p-6">
+            <div class="flex justify-between items-center mb-8">
+                <h2 class="text-2xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">Menu</h2>
+                <button onclick="closeMobileMenu()" class="text-gray-500 hover:text-gray-700">
+                    <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                    </svg>
+                </button>
+            </div>
+            {% if session.user_phone %}
+                <div class="space-y-4 mb-8">
+                    <a href="{{ url_for('dashboard') }}" class="block p-4 rounded-xl bg-blue-50 border-l-4 border-blue-500 hover:bg-blue-100 transition">📊 Dashboard</a>
+                    <a href="{{ url_for('new_report') }}" class="block p-4 rounded-xl bg-emerald-50 border-l-4 border-emerald-500 hover:bg-emerald-100 transition">➕ New Report</a>
+                    <a href="{{ url_for('map_view') }}" class="block p-4 rounded-xl bg-green-50 border-l-4 border-green-500 hover:bg-green-100 transition">🗺️ Map</a>
+                    {% if session.user_role in ['SuperAdmin', 'Admin'] %}
+                        <a href="{{ url_for('users') }}" class="block p-4 rounded-xl bg-purple-50 border-l-4 border-purple-500 hover:bg-purple-100 transition">👥 Users</a>
+                    {% endif %}
+                    <a href="{{ url_for('logout') }}" class="block p-4 bg-red-50 border-l-4 border-red-500 hover:bg-red-100 transition text-red-800 font-semibold">Logout</a>
+                </div>
+            {% else %}
+                <!-- Mobile: Sign Up + Login -->
+                <div class="space-y-4 mb-8">
+                    <a href="{{ url_for('register') }}" class="block p-6 bg-gradient-to-r from-emerald-50 to-green-50 border-2 border-emerald-200 rounded-2xl text-emerald-800 font-semibold text-lg hover:bg-emerald-100 transition-all shadow-md hover:shadow-lg transform hover:-translate-y-1">👤 Sign Up</a>
+                    <a href="{{ url_for('login') }}" class="block p-6 bg-gradient-to-r from-blue-50 to-indigo-50 border-2 border-blue-200 rounded-2xl text-blue-800 font-semibold text-lg hover:bg-blue-100 transition-all shadow-md hover:shadow-lg transform hover:-translate-y-1">🚀 Sign In</a>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <main class="container mx-auto px-4 sm:px-6 lg:px-8 py-8 lg:py-12 max-w-7xl">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="mb-6 p-6 rounded-2xl shadow-lg
+                        {% if category == 'error' %}
+                            bg-red-50 border-4 border-red-200 border-l-[6px] border-l-red-500
+                        {% else %}
+                            bg-green-50 border-4 border-green-200 border-l-[6px] border-l-green-500
+                        {% endif %}">
+                        <div class="flex items-center">
+                            {% if category == 'error' %}
+                                <svg class="w-8 h-8 text-red-500 mr-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                                </svg>
+                            {% else %}
+                                <svg class="w-8 h-8 text-green-500 mr-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+                                </svg>
+                            {% endif %}
+                            <div>
+                                <p class="text-lg font-semibold text-gray-900">{{ message }}</p>
+                            </div>
+                        </div>
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+        {% block content %}{% endblock %}
+    </main>
+
+    {% block scripts %}{% endblock %}
+
+    <!-- PWA Service Worker & Mobile Menu JS -->
+    <script>
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('/static/sw.js').catch(() => {});
+        }
+
+        // Mobile menu toggle
+        document.getElementById('mobile-menu-btn')?.addEventListener('click', () => {
+            document.getElementById('mobile-menu').classList.remove('hidden');
+            document.getElementById('mobile-nav').classList.remove('translate-x-full');
+        });
+
+        function closeMobileMenu() {
+            document.getElementById('mobile-menu').classList.add('hidden');
+            document.getElementById('mobile-nav').classList.add('translate-x-full');
+        }
+
+        document.getElementById('mobile-menu')?.addEventListener('click', closeMobileMenu);
+    </script>
+</body>
+</html>

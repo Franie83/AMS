@@ -1,0 +1,141 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="flex justify-between items-center mb-8">
+    <h2 class="text-3xl font-bold text-gray-800">🗺️ Reports Map</h2>
+    <a href="{{ url_for('dashboard') }}" class="bg-gray-600 hover:bg-gray-700 text-white px-6 py-2 rounded-lg font-medium">← Back to Dashboard</a>
+</div>
+
+<div class="bg-white p-8 rounded-xl shadow-lg">
+    {% if reports %}
+    <!-- SVG Relative Map (0,0 to 800,600 viewBox) -->
+    <svg viewBox="0 0 800 600" class="w-full h-[500px] border-2 border-gray-200 rounded-lg mx-auto block" id="reportMap">
+        <!-- Edo State Boundary (Simplified SVG Path) -->
+        <path d="M100,100 L700,100 L700,450 L400,500 L100,450 Z" 
+              fill="#f0f8ff" stroke="#4682b4" stroke-width="3"/>
+        
+        <!-- Grid Lines -->
+        <g stroke="#e0e0e0" stroke-width="1" opacity="0.5">
+            {% for x in range(0, 801, 100) %}
+                <line x1="{{ x }}" y1="0" x2="{{ x }}" y2="600"/>
+            {% endfor %}
+            {% for y in range(0, 601, 100) %}
+                <line x1="0" y1="{{ y }}" x2="800" y2="{{ y }}"/>
+            {% endfor %}
+        </g>
+        
+        <!-- Report Markers (Normalized Coordinates) - CLICKABLE -->
+        {% for report in reports %}
+            {% if report.latitude and report.longitude %}
+                {% set lon_range = (max_lon - min_lon) if (max_lon - min_lon) > 0.001 else 0.01 %}
+                {% set lat_range = (max_lat - min_lat) if (max_lat - min_lat) > 0.001 else 0.01 %}
+                {% set x = ((report.longitude - min_lon) / lon_range) * 700 + 100 %}
+                {% set y = 600 - ((report.latitude - min_lat) / lat_range) * 450 + 100 %}
+                <a xlink:href="https://www.google.com/maps?q={{ report.latitude }},{{ report.longitude }}&ll={{ report.latitude }},{{ report.longitude }}&z=17" target="_blank">
+                    <g transform="translate({{ x }}, {{ y }})">
+                        <!-- Status-based marker color -->
+                        <circle r="{{ 14 if report.status == 'Pending' else 12 if report.status == 'In Progress' else 10 }}" 
+                                fill="{% if report.status == 'Pending' %}#ef4444
+                                {% elif report.status == 'In Progress' %}#f59e0b
+                                {% elif report.status == 'Completed' %}#10b981
+                                {% else %}#3b82f6{% endif %}"
+                                stroke="white" stroke-width="3" opacity="0.9"
+                                style="cursor: pointer; transition: all 0.2s;"/>
+                        <!-- Glow effect -->
+                        <circle r="{{ 18 if report.status == 'Pending' else 16 if report.status == 'In Progress' else 14 }}" 
+                                fill="none" stroke="{% if report.status == 'Pending' %}#ef4444
+                                {% elif report.status == 'In Progress' %}#f59e0b
+                                {% elif report.status == 'Completed' %}#10b981
+                                {% else %}#3b82f6{% endif %}" 
+                                stroke-width="2" opacity="0.3"/>
+                        <!-- Status label -->
+                        <text y="4" text-anchor="middle" fill="white" font-size="11" font-weight="bold">
+                            {{ report.status[0] }}
+                        </text>
+                        <!-- Hover tooltip -->
+                        <title>🗺️ CLICK to open Google Maps
+{{ report.category }} - {{ report.status }}
+{{ report.description[:50] }}
+📍 {{ report.latitude }}, {{ report.longitude }}</title>
+                    </g>
+                </a>
+            {% endif %}
+        {% endfor %}
+        
+        <!-- Legend -->
+        <g transform="translate(20, 30)">
+            <text x="0" y="20" font-size="16" font-weight="bold" fill="#1f2937">Legend</text>
+            <circle cx="10" cy="45" r="8" fill="#ef4444" stroke="white" stroke-width="2"/>
+            <text x="25" y="50" font-size="14" fill="#374151">Pending</text>
+            <circle cx="10" cy="70" r="10" fill="#f59e0b" stroke="white" stroke-width="2"/>
+            <text x="25" y="75" font-size="14" fill="#374151">In Progress</text>
+            <circle cx="10" cy="95" r="8" fill="#10b981" stroke="white" stroke-width="2"/>
+            <text x="25" y="100" font-size="14" fill="#374151">Completed</text>
+        </g>
+    </svg>
+    
+    <div class="mt-6 text-center">
+        <p class="text-sm text-gray-600">
+            📍 <strong>{{ reports|selectattr('latitude', 'defined')|selectattr('longitude', 'defined')|list|length }}</strong> total reports plotted | 
+            🗺️ <strong>CLICK markers</strong> to open in Google Maps (Street View)
+        </p>
+    </div>
+    {% else %}
+    <div class="text-center py-20">
+        <svg class="w-24 h-24 mx-auto mb-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/>
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/>
+        </svg>
+        <h3 class="text-xl font-semibold text-gray-900 mb-2">No reports with location data</h3>
+        <p class="text-gray-500 mb-6">Enable location access when creating reports to see them on the map</p>
+        <a href="{{ url_for('new_report') }}" class="bg-blue-600 text-white px-8 py-3 rounded-lg font-medium inline-flex items-center">
+            📍 Create Report with Location
+        </a>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Reports List (CLICKABLE Google Maps) -->
+{% if reports %}
+<div class="mt-12">
+    <h3 class="text-2xl font-bold mb-6">📋 Reports with Location</h3>
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {% for report in reports %}
+            {% if report.latitude and report.longitude %}
+                <a href="https://www.google.com/maps?q={{ report.latitude }},{{ report.longitude }}&ll={{ report.latitude }},{{ report.longitude }}&z=17" 
+                   target="_blank" class="group">
+                    <div class="bg-white p-6 rounded-xl shadow-lg hover:shadow-2xl transition-all border-l-4 hover:scale-[1.02] hover:-translate-y-1
+                        {% if report.status == 'Pending' %}border-red-500 bg-red-50
+                        {% elif report.status == 'In Progress' %}border-yellow-500 bg-yellow-50
+                        {% elif report.status == 'Completed' %}border-green-500 bg-emerald-50
+                        {% else %}border-blue-500 bg-blue-50{% endif %}">
+                        <div class="flex justify-between items-start mb-3">
+                            <span class="px-3 py-1 rounded-full text-sm font-bold text-white
+                                {% if report.status == 'Pending' %}bg-red-500
+                                {% elif report.status == 'In Progress' %}bg-yellow-500
+                                {% elif report.status == 'Completed' %}bg-green-500
+                                {% else %}bg-blue-500{% endif %}">
+                                {{ report.status }}
+                            </span>
+                            <small class="text-gray-500 group-hover:text-blue-600 font-medium">🗺️ Google Maps</small>
+                        </div>
+                        <h4 class="font-bold text-lg mb-2 text-gray-900 group-hover:text-blue-600">{{ report.category }}</h4>
+                        <p class="text-gray-700 mb-3 text-sm leading-relaxed">{{ report.description[:80] }}{% if report.description|length > 80 %}...{% endif %}</p>
+                        <div class="text-xs space-y-1 text-gray-500 bg-gray-50 p-3 rounded-lg">
+                            <div class="font-mono text-sm text-gray-800">📍 {{ "%.4f"|format(report.latitude) }}, {{ "%.4f"|format(report.longitude) }}</div>
+                            <div>👤 {{ report.userPhoneNumber }}</div>
+                            <div class="text-xs text-blue-600 font-medium mt-1">Click card → Street View</div>
+                        </div>
+                    </div>
+                </a>
+            {% endif %}
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
+
+<style>
+/* Hover animations */
+.report-item:hover { transform: translateY(-2px); }
+svg a:hover circle { r: 20 !important; transform: scale(1.2); }
+</style>
+{% endblock %}

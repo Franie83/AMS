@@ -1,0 +1,45 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+venv39/
+env/
+ENV/
+build/
+dist/
+*.egg-info/
+*.egg
+
+# Flask/Database
+instance/
+*.db
+*.sqlite
+*.sqlite3
+
+# Uploads
+static/uploads/
+*.mp4
+*.mov
+*.avi
+*.mkv
+*.webm
+
+# PyInstaller
+*.spec
+*.exe
+build/
+dist/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db

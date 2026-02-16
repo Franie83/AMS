@@ -1,0 +1,292 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="max-w-2xl mx-auto px-4 py-8">
+    <!-- Back Navigation -->
+    <a href="{{ url_for('dashboard') }}" class="inline-flex items-center text-blue-600 hover:text-blue-800 mb-8 font-medium">
+        <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+        </svg>
+        Back to Dashboard
+    </a>
+
+    {% if report %}
+    <div class="bg-white rounded-3xl shadow-2xl border-4 
+        {% if report.status == 'Pending' %}border-red-500 ring-4 ring-red-100
+        {% elif report.status == 'In Progress' %}border-yellow-500 ring-4 ring-yellow-100
+        {% elif report.status == 'Resolved' %}border-emerald-500 ring-4 ring-emerald-100
+        {% elif report.status == 'Completed' %}border-green-500 ring-4 ring-green-100
+        {% else %}border-gray-500 ring-4 ring-gray-100{% endif %}">
+
+        <!-- Header -->
+        <div class="bg-gradient-to-r p-8 rounded-t-3xl text-white shadow-xl
+            {% if report.status == 'Pending' %}from-red-500 to-red-600
+            {% elif report.status == 'In Progress' %}from-yellow-500 to-orange-500
+            {% elif report.status == 'Resolved' %}from-emerald-500 to-green-600
+            {% elif report.status == 'Completed' %}from-green-500 to-emerald-600
+            {% else %}from-gray-500 to-gray-600{% endif %}">
+            <div class="flex justify-between items-start">
+                <div>
+                    <h1 class="text-3xl font-bold mb-2">{{ report.category }}</h1>
+                    <p class="text-xl opacity-90 leading-relaxed">{{ report.description }}</p>
+                </div>
+                <span class="px-6 py-3 rounded-2xl bg-white bg-opacity-20 font-bold text-lg shadow-lg">
+                    {{ report.status }}
+                </span>
+            </div>
+
+            <!-- Meta info row -->
+            <div class="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4 text-sm opacity-90">
+                <div class="flex items-center">
+                    <span class="w-10 h-10 bg-white bg-opacity-20 rounded-xl flex items-center justify-center mr-3">📅</span>
+                    {{ report.timestamp|datetimeformat }}
+                </div>
+                {% if report.latitude and report.longitude %}
+                <div class="flex items-center">
+                    <span class="w-10 h-10 bg-white bg-opacity-20 rounded-xl flex items-center justify-center mr-3">📍</span>
+                    {{ "%.4f"|format(report.latitude) }}, {{ "%.4f"|format(report.longitude) }}
+                </div>
+                {% endif %}
+                <div class="flex items-center">
+                    <span class="w-10 h-10 bg-white bg-opacity-20 rounded-xl flex items-center justify-center mr-3">👤</span>
+                    {% if report.submitter %}
+                        {{ report.submitter.fullName }}
+                    {% else %}
+                        {{ report.userPhoneNumber }}
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Video Evidence (Before) -->
+        {% if report.videoUrl %}
+        <div class="p-8">
+            <h3 class="text-2xl font-bold mb-6 text-gray-800 flex items-center">
+                📹 Evidence Video
+                <span class="ml-3 px-3 py-1 bg-red-100 text-red-800 text-sm font-bold rounded-full">Before</span>
+            </h3>
+            <div class="aspect-video bg-gradient-to-br from-gray-900 to-black rounded-2xl overflow-hidden shadow-2xl border-4 border-gray-200">
+                <video controls class="w-full h-full" src="{{ report.videoUrl }}" 
+                       poster="https://via.placeholder.com/1280x720/1a202c/ffffff?text=Video+Evidence">
+                    Your browser doesn't support video playback.
+                </video>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Status Actions - Admin/SuperAdmin only -->
+        {% if current_user and current_user.role in ['SuperAdmin', 'Admin'] %}
+        <div class="p-8 bg-gradient-to-b from-gray-50 to-white border-t-2 border-gray-100">
+            <h3 class="text-2xl font-bold mb-8 text-gray-800 flex items-center">
+                ⚙️ Admin Actions
+                <span class="ml-3 text-sm text-gray-500 font-medium">(SuperAdmin/Admin only)</span>
+            </h3>
+            
+            <div class="flex flex-wrap gap-4">
+                <div class="flex-1 min-w-[200px]">
+                    <select id="status-select" class="w-full p-4 border-2 border-gray-200 rounded-2xl focus:ring-4 focus:ring-blue-500 focus:border-transparent shadow-lg font-medium text-lg">
+                        <option value="Pending" {% if report.status == 'Pending' %}selected{% endif %}>⏳ Pending</option>
+                        <option value="In Progress" {% if report.status == 'In Progress' %}selected{% endif %}>🔄 In Progress</option>
+                        <option value="Completed" {% if report.status == 'Completed' %}selected{% endif %}>🎉 Completed</option>
+                    </select>
+                </div>
+                
+                <button onclick="updateStatus()" 
+                        class="bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white px-8 py-4 rounded-2xl font-bold text-lg shadow-xl hover:shadow-2xl transition-all transform hover:scale-105 whitespace-nowrap">
+                    💾 Update Status
+                </button>
+                
+                {% if current_user.role == 'SuperAdmin' %}
+                <button onclick="forwardReport()" 
+                        class="bg-gradient-to-r from-purple-500 to-pink-600 hover:from-purple-600 hover:to-pink-700 text-white px-8 py-4 rounded-2xl font-bold text-lg shadow-xl hover:shadow-2xl transition-all transform hover:scale-105 whitespace-nowrap">
+                    🔄 Forward to MDA
+                </button>
+                {% endif %}
+            </div>
+
+            <!-- 🎥 RESOLUTION VIDEO RECORDER -->
+            <div id="resolution-video-section"
+                 class="mt-12 p-8 bg-gradient-to-r from-emerald-50 to-green-50 border-2 border-emerald-200 rounded-3xl shadow-2xl{% if report.status != 'Completed' %} hidden{% endif %}">
+                <h3 class="text-2xl font-bold mb-6 text-emerald-800 flex items-center">
+                    🎥 Record Resolution Video 
+                    <span class="ml-3 px-3 py-1 bg-emerald-100 text-emerald-800 text-sm font-bold rounded-full">After</span>
+                </h3>
+                
+                <div class="space-y-6">
+                    <video id="resolution-preview" class="w-full h-64 rounded-2xl bg-gray-900 object-cover shadow-xl" autoplay muted playsinline></video>
+                    
+                    <div class="flex gap-4 justify-center">
+                        <button id="start-resolution" class="flex-1 bg-gradient-to-r from-emerald-500 to-green-600 text-white py-4 px-8 rounded-2xl font-bold text-lg shadow-xl hover:shadow-2xl transition-all hover:scale-105">
+                            🔴 Record After Video
+                        </button>
+                        <button id="stop-resolution" class="flex-1 bg-gray-600 text-white py-4 px-8 rounded-2xl font-bold text-lg shadow-2xl hover:shadow-2xl transition-all hover:scale-105 hidden">
+                            ⏹️ Stop Recording
+                        </button>
+                    </div>
+                    
+                    <button id="upload-resolution" class="w-full bg-gradient-to-r from-green-600 to-emerald-700 text-white py-4 px-8 rounded-2xl font-bold text-xl shadow-2xl hover:shadow-3xl transition-all hover:scale-105 hidden">
+                        ✅ Upload Resolution Video
+                    </button>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Resolution Video (After) - Shows after upload -->
+        {% if report.resolutionVideoUrl %}
+        <div class="p-8 mt-8 bg-gradient-to-r from-emerald-50 to-green-50 border-t-2 border-emerald-200">
+            <h3 class="text-2xl font-bold mb-6 text-gray-800 flex items-center">
+                ✅ Resolution Video
+                <span class="ml-3 px-3 py-1 bg-emerald-100 text-emerald-800 text-sm font-bold rounded-full">After</span>
+            </h3>
+            <div class="aspect-video bg-gradient-to-br from-emerald-900 to-green-900 rounded-2xl overflow-hidden shadow-2xl border-4 border-emerald-200">
+                <video controls class="w-full h-full" 
+                       src="{{ report.resolutionVideoUrl }}" 
+                       poster="https://via.placeholder.com/1280x720/059669/ffffff?text=Resolution+Complete">
+                    Your browser doesn't support video playback.
+                </video>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- WhatsApp Share -->
+        {% if report.status in ['Completed', 'Resolved', 'Closed'] %}
+        <div class="mt-8 p-8 bg-gradient-to-r from-green-50 to-emerald-50 border-2 border-green-200 rounded-3xl shadow-xl">
+            <h3 class="text-2xl font-bold mb-6 text-green-800 flex items-center">
+                📱 Notify Citizen
+            </h3>
+            <a href="https://wa.me/{{ report.userPhoneNumber[1:] if report.userPhoneNumber.startswith('0') else report.userPhoneNumber }}?text=✅%20Your%20EdoVoice%20report%20%22{{ report.description|truncate(100) }}%22%20has%20been%20{{ report.status|lower }}!%20Thank%20you%20for%20using%20EdoVoice%20and%20being%20patriotic!%20https://edovoice.ng/report/{{ report.id }}" 
+               class="inline-flex items-center justify-center w-full bg-gradient-to-r from-green-600 to-emerald-700 hover:from-green-700 hover:to-emerald-800 text-white px-8 py-5 rounded-2xl font-bold text-xl shadow-2xl hover:shadow-3xl transition-all transform hover:scale-105 group">
+                <svg class="w-7 h-7 mr-3 group-hover:animate-bounce" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-.02-.17 9.86 9.86 0 00.02-.17c.115-2.43 1.154-4.51 2.37-6.099 1.062-1.377 2.28-2.102 3.518-2.251a13.255 13.255 0 011.866.087C21.18 10.5 24 13.323 24 17.818A8.221 8.221 0 0121.42 24c-.324-.018-.639-.05-.953-.084a12.27 12.27 0 01-6.113-4.614zM15.39.56c.593-.589 1.24-.109 1.487.14.247.25.423.592.423 1.006 0 1.519-.888 2.63 1.936 2.63.817 0 1.51-.4 1.856-.62l2.28-2.159c.806-.716 1.847.26 1.04.98L21.05 5.5a1.238 1.238 0 01-.47.43l-2.28 2.159c-.826.784-1.795.29-1.487-.14-.247-.25-.423-.592-.423-1.006 0-1.519.888-2.63-1.936-2.63z"/>
+                </svg>
+                Share Resolution on WhatsApp
+            </a>
+        </div>
+        {% endif %}
+    </div> <!-- END MAIN REPORT CARD -->
+
+    <script>
+    // ✅ UPDATED: Status update with resolution video prompt
+    async function updateStatus() {
+        const status = document.getElementById('status-select').value;
+        const btn = event.target;
+        btn.disabled = true;
+        btn.innerHTML = '⏳ Updating...';
+        
+        try {
+            const response = await fetch(`/api/reports/{{ report.id }}/status`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({status: status})
+            });
+            const data = await response.json();
+            
+            if (data.success) {
+                if (status === 'Completed' && data.prompt_resolution_video) {
+                    document.getElementById('resolution-video-section').classList.remove('hidden');
+                    initResolutionCamera();
+                    return;
+                } else {
+                    location.reload();
+                }
+            } else {
+                alert('Update failed: ' + (data.error || 'Unknown error'));
+            }
+        } catch (error) {
+            alert('Network error');
+        }
+        
+        btn.disabled = false;
+        btn.innerHTML = '💾 Update Status';
+    }
+    
+    // ✅ RESOLUTION VIDEO RECORDER
+    let resolutionStream = null;
+    let resolutionRecorder = null;
+    let resolutionChunks = [];
+    
+    async function initResolutionCamera() {
+        try {
+            resolutionStream = await navigator.mediaDevices.getUserMedia({ 
+                video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } }, 
+                audio: true 
+            });
+            document.getElementById('resolution-preview').srcObject = resolutionStream;
+        } catch(err) {
+            alert('Camera access denied. Please allow camera permissions.');
+        }
+    }
+    
+    document.getElementById('start-resolution')?.addEventListener('click', () => {
+        resolutionChunks = [];
+        resolutionRecorder = new MediaRecorder(resolutionStream, { 
+            mimeType: 'video/webm;codecs=vp9' 
+        });
+        
+        resolutionRecorder.ondataavailable = (event) => {
+            if (event.data.size > 0) {
+                resolutionChunks.push(event.data);
+            }
+        };
+        
+        resolutionRecorder.onstop = () => {
+            const resolutionBlob = new Blob(resolutionChunks, { type: 'video/mp4' });
+            document.getElementById('upload-resolution').classList.remove('hidden');
+            console.log('✅ Video recorded, ready for upload');
+        };
+        
+        resolutionRecorder.start(100);
+        document.getElementById('start-resolution').classList.add('hidden');
+        document.getElementById('stop-resolution').classList.remove('hidden');
+    });
+    
+    document.getElementById('stop-resolution')?.addEventListener('click', () => {
+        if (resolutionRecorder && resolutionRecorder.state === 'recording') {
+            resolutionRecorder.stop();
+        }
+        document.getElementById('stop-resolution').classList.add('hidden');
+    });
+    
+    document.getElementById('upload-resolution')?.addEventListener('click', async () => {
+        if (!resolutionChunks.length) {
+            alert('Please record a video first!');
+            return;
+        }
+        
+        const resolutionBlob = new Blob(resolutionChunks, { type: 'video/mp4' });
+        const formData = new FormData();
+        formData.append('resolutionVideo', resolutionBlob, 'resolution.mp4');
+        
+        const btn = document.getElementById('upload-resolution');
+        btn.innerHTML = '⏳ Uploading...';
+        btn.disabled = true;
+        
+        try {
+            const response = await fetch(`/api/reports/{{ report.id }}/resolution-video`, {
+                method: 'POST',
+                body: formData
+            });
+            const data = await response.json();
+            
+            if (data.success) {
+                alert('✅ Resolution video uploaded successfully!');
+                location.reload();
+            } else {
+                alert('❌ Upload failed: ' + (data.error || 'Unknown error'));
+            }
+        } catch (error) {
+            console.error('Upload error:', error);
+            alert('Network error during upload');
+        }
+        
+        btn.innerHTML = '✅ Upload Resolution Video';
+        btn.disabled = false;
+    });
+    
+    async function forwardReport() {
+        alert('Forward to MDA feature coming soon!');
+    }
+    </script>
+    {% endif %}
+</div>
+{% endblock %}

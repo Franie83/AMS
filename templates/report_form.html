@@ -1,0 +1,306 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="max-w-4xl mx-auto space-y-8">
+    <!-- Header -->
+    <div class="text-center">
+        <h1 class="text-4xl font-bold bg-gradient-to-r from-emerald-500 to-green-600 bg-clip-text text-transparent mb-4">
+            ➕ New Report
+        </h1>
+        <p class="text-xl text-gray-600">Record video evidence of the issue (Required)</p>
+    </div>
+
+    <!-- Video Recorder -->
+    <div class="bg-white/80 backdrop-blur-md rounded-3xl p-8 shadow-2xl border border-gray-200">
+        <div class="grid md:grid-cols-2 gap-8 items-start">
+            <!-- Camera Preview -->
+            <div class="space-y-4">
+                <div class="relative">
+                    <video id="preview" class="w-full h-80 rounded-2xl bg-gray-900 object-cover shadow-2xl" autoplay muted playsinline></video>
+                    <div id="recording-indicator" class="absolute top-4 right-4 hidden bg-red-500 text-white px-4 py-2 rounded-full text-sm font-bold animate-pulse shadow-lg border-2 border-white">
+                        🎥 RECORDING...
+                    </div>
+                    <div id="timer" class="absolute bottom-4 left-4 bg-black/70 text-white px-4 py-2 rounded-full text-lg font-bold hidden">00:00</div>
+                </div>
+                
+                <!-- Controls -->
+                <div id="recording-controls" class="flex gap-4 justify-center">
+                    <button id="start-record" class="flex-1 bg-gradient-to-r from-red-500 to-red-600 text-white py-4 px-6 rounded-2xl font-bold text-lg shadow-xl hover:shadow-2xl hover:from-red-600 hover:to-red-700 transition-all transform hover:scale-105">
+                        🔴 Start Recording
+                    </button>
+                </div>
+                
+                <!-- Stop Button (Hidden initially) -->
+                <div id="stop-controls" class="flex gap-4 justify-center hidden">
+                    <button id="stop-record" class="flex-1 bg-gradient-to-r from-gray-600 to-gray-700 text-white py-4 px-6 rounded-2xl font-bold text-lg shadow-xl hover:shadow-2xl hover:from-gray-700 hover:to-gray-800 transition-all transform hover:scale-105">
+                        ⏹️ Stop Recording
+                    </button>
+                </div>
+                
+                <!-- Recorded Video -->
+                <div id="recorded-section" class="hidden">
+                    <video id="recorded-video" class="w-full h-48 rounded-2xl bg-gray-900 object-cover shadow-xl" controls playsinline></video>
+                    <div class="flex gap-3 mt-4">
+                        <button id="re-record" class="flex-1 bg-gradient-to-r from-blue-500 to-blue-600 text-white py-3 px-6 rounded-xl font-bold shadow-lg hover:shadow-xl hover:from-blue-600 hover:to-blue-700 transition-all">
+                            🔄 Re-record
+                        </button>
+                        <button id="use-recording" class="flex-1 bg-gradient-to-r from-emerald-500 to-green-600 text-white py-3 px-6 rounded-xl font-bold shadow-lg hover:shadow-xl hover:from-emerald-600 hover:to-green-700 transition-all">
+                            ✅ Use This
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Form Fields -->
+            <div class="space-y-6">
+                <!-- UPDATED: Issue Category -> Admin dropdown -->
+                <div>
+                    <label class="block text-sm font-bold text-gray-700 mb-3 flex items-center">
+                        <span class="mr-2">📋</span> Issue Category (MDA Admin) <span class="text-red-500 text-xs">*</span>
+                    </label>
+                    <select id="category"
+        class="w-full p-4 border-2 border-gray-200 rounded-2xl focus:ring-4 focus:ring-emerald-500 focus:border-transparent shadow-lg transition-all"
+        required>
+    <option value="">Select responsible MDA admin...</option>
+    {% for user in admin_users %}
+    <option value="{{ user.fullName }}">
+    {{ user.fullName }}
+</option>
+
+    {% endfor %}
+</select>
+
+                    <p class="text-xs text-gray-500 mt-1">
+                        Select the MDA administrator responsible for this issue.
+                    </p>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-bold text-gray-700 mb-3 flex items-center">
+                        <span class="mr-2">📝</span> Description <span class="text-red-500 text-xs">*</span>
+                    </label>
+                    <textarea id="description" rows="4" class="w-full p-4 border-2 border-gray-200 rounded-2xl focus:ring-4 focus:ring-emerald-500 focus:border-transparent shadow-lg resize-vertical transition-all" placeholder="Describe the issue in detail..." required></textarea>
+                </div>
+
+                <div class="space-y-3">
+                    <label class="block text-sm font-bold text-gray-700 mb-2">📍 Location</label>
+                    <div id="location-display" class="p-4 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-2xl border-2 border-blue-100 text-sm shadow-inner">
+                        Detecting location... <span id="location-status">🔄</span>
+                    </div>
+                    <button id="get-location" class="w-full bg-gradient-to-r from-indigo-500 to-purple-600 text-white py-3 px-6 rounded-xl font-bold shadow-lg hover:shadow-xl hover:from-indigo-600 hover:to-purple-700 transition-all">
+                        📍 Use My Location
+                    </button>
+                </div>
+
+                <!-- Submit Button -->
+                <button id="submit-report" class="w-full bg-gradient-to-r from-emerald-500 to-green-600 text-white py-4 px-6 rounded-2xl font-bold text-xl shadow-2xl hover:shadow-3xl hover:from-emerald-600 hover:to-green-700 transition-all transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none" disabled>
+                    🚀 Submit Report
+                </button>
+
+                <div class="text-xs text-gray-500 text-center">
+                    <span class="font-medium">Required:</span> Video + Category + Description (10+ chars)
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+let mediaRecorder = null;
+let recordedChunks = [];
+let stream = null;
+let recordingTimer = null;
+let seconds = 0;
+let currentLat = null, currentLng = null;
+let isVideoReady = false;
+let recordedBlob = null;
+
+// 🔥 Check submit button state
+function checkSubmitReady() {
+    const category = document.getElementById('category').value.trim();
+    const description = document.getElementById('description').value.trim();
+    const submitBtn = document.getElementById('submit-report');
+    
+    const ready = isVideoReady && category && description.length >= 10;
+    
+    submitBtn.disabled = !ready;
+    if (ready) {
+        submitBtn.innerHTML = '🚀 Submit Report ✓';
+    } else {
+        submitBtn.innerHTML = '🚀 Submit Report';
+    }
+}
+
+// Initialize camera
+async function initCamera() {
+    try {
+        stream = await navigator.mediaDevices.getUserMedia({ 
+            video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 } }, 
+            audio: true 
+        });
+        document.getElementById('preview').srcObject = stream;
+    } catch(err) {
+        alert('Camera access denied. Please allow camera access.');
+    }
+}
+
+// Start recording
+document.getElementById('start-record').addEventListener('click', () => {
+    recordedChunks = [];
+    mediaRecorder = new MediaRecorder(stream, { 
+        mimeType: 'video/webm;codecs=vp9' 
+    });
+    
+    mediaRecorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+            recordedChunks.push(event.data);
+        }
+    };
+    
+    mediaRecorder.onstop = () => {
+        recordedBlob = new Blob(recordedChunks, { type: 'video/mp4' });
+        document.getElementById('recorded-video').src = URL.createObjectURL(recordedBlob);
+        document.getElementById('recorded-section').classList.remove('hidden');
+        document.getElementById('stop-controls').classList.add('hidden');
+        document.getElementById('recording-indicator').classList.add('hidden');
+    };
+    
+    mediaRecorder.start(100);
+    document.getElementById('start-record').classList.add('hidden');
+    document.getElementById('stop-controls').classList.remove('hidden');
+    document.getElementById('recording-indicator').classList.remove('hidden');
+    
+    // Timer
+    // Timer with 60s hard limit
+seconds = 0;
+document.getElementById('timer').classList.remove('hidden');
+recordingTimer = setInterval(() => {
+    seconds++;
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    document.getElementById('timer').textContent =
+        `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+
+    // ⏱️ Auto-stop at 60 seconds
+    if (seconds >= 60 && mediaRecorder && mediaRecorder.state === 'recording') {
+        mediaRecorder.stop();              // stop capture
+        clearInterval(recordingTimer);     // stop timer
+        document.getElementById('timer').classList.add('hidden');
+        alert('⏱️ Maximum recording length is 60 seconds. Recording stopped.');
+    }
+}, 1000);
+
+});
+
+// Stop recording
+document.getElementById('stop-record').addEventListener('click', () => {
+    if (mediaRecorder && mediaRecorder.state === 'recording') {
+        mediaRecorder.stop();
+    }
+    clearInterval(recordingTimer);
+    document.getElementById('timer').classList.add('hidden');
+});
+
+// "Use This"
+document.getElementById('use-recording').addEventListener('click', () => {
+    console.log('✅ Video confirmed, size:', recordedBlob?.size);
+    isVideoReady = true;
+    checkSubmitReady();
+    alert('✅ Video ready! Fill category & description to submit.');
+});
+
+// Re-record
+document.getElementById('re-record').addEventListener('click', () => {
+    isVideoReady = false;
+    recordedChunks = [];
+    document.getElementById('recorded-section').classList.add('hidden');
+    document.getElementById('start-record').classList.remove('hidden');
+    checkSubmitReady();
+    
+    document.getElementById('preview').srcObject = stream;
+});
+
+// Location
+document.getElementById('get-location').addEventListener('click', () => {
+    navigator.geolocation.getCurrentPosition(
+        (pos) => {
+            currentLat = pos.coords.latitude;
+            currentLng = pos.coords.longitude;
+            document.getElementById('location-display').innerHTML = 
+                `📍 ${currentLat.toFixed(6)}, ${currentLng.toFixed(6)}<br><span class="text-green-600 font-bold">✅ Location captured</span>`;
+        },
+        () => {
+            document.getElementById('location-display').innerHTML = 
+                '<span class="text-red-500">❌ Location access denied</span>';
+        }
+    );
+});
+
+// Submit
+document.getElementById('submit-report').addEventListener('click', async (e) => {
+    e.preventDefault();
+    
+    if (!isVideoReady || !recordedBlob) {
+        alert('❌ Please record video and click "✅ Use This" first!');
+        return;
+    }
+    
+    const category = document.getElementById('category').value.trim();
+    const description = document.getElementById('description').value.trim();
+    
+    if (!category) {
+        alert('❌ Please select a category!');
+        return;
+    }
+    
+    if (description.length < 10) {
+        alert('❌ Description must be at least 10 characters!');
+        return;
+    }
+    
+    const formData = new FormData();
+    formData.append('video', recordedBlob, 'report_video.mp4');
+    formData.append('category', category);
+    formData.append('description', description);
+    if (currentLat && currentLng) {
+        formData.append('latitude', currentLat);
+        formData.append('longitude', currentLng);
+    }
+    
+    const submitBtn = document.getElementById('submit-report');
+    submitBtn.innerHTML = '⏳ Uploading Video...';
+    submitBtn.disabled = true;
+    
+    try {
+        console.log('📤 Uploading video, size:', recordedBlob.size);
+        const response = await fetch('/new-report', { 
+            method: 'POST', 
+            body: formData 
+        });
+        
+        const result = await response.json();
+        
+        if (response.ok && result.success) {
+            alert('🎉 Report submitted successfully!');
+            window.location.href = '/dashboard';
+        } else {
+            throw new Error(result.error || 'Upload failed');
+        }
+    } catch (error) {
+        console.error('Submit error:', error);
+        alert('❌ Upload failed: ' + error.message);
+        submitBtn.innerHTML = '🚀 Submit Report ✓';
+        submitBtn.disabled = false;
+    }
+});
+
+// Watch form changes
+document.getElementById('category').addEventListener('change', checkSubmitReady);
+document.getElementById('description').addEventListener('input', checkSubmitReady);
+setInterval(checkSubmitReady, 500);
+
+// Initialize
+initCamera();
+checkSubmitReady();
+</script>
+
+{% endblock %}
