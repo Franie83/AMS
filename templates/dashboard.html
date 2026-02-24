@@ -1,58 +1,403 @@
 {% extends "layout.html" %}
 {% block body %}
 <div class="container mt-4">
-    <h3>📊 Dashboard - Attendance Insights</h3>
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h3>📊 Dashboard - Advanced Attendance Analytics</h3>
+        <div>
+            <span class="text-muted me-2">
+                <small>Last updated: {{ now().strftime('%Y-%m-%d %H:%M:%S') }}</small>
+            </span>
+            <button class="btn btn-sm btn-outline-primary me-2" onclick="refreshDashboard()">
+                🔄 Refresh Data
+            </button>
+            <button class="btn btn-sm btn-danger" onclick="downloadDashboardPDF()">
+                <i class="fas fa-file-pdf me-2"></i>Download PDF Report
+            </button>
+        </div>
+    </div>
     
-    <!-- Stacked Bar Chart WITH TOTALS -->
-    <div class="card shadow-sm p-3">
-        <div style="position: relative; height: 400px;">
-            <canvas id="attendanceChart"></canvas>
+    <!-- Summary Cards Row 1 - Basic Stats -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card bg-primary text-white">
+                <div class="card-body">
+                    <h5 class="card-title">Active Employees</h5>
+                    <h2>{{ stats|length }}</h2>
+                    <small>Currently in system</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-success text-white">
+                <div class="card-body">
+                    <h5 class="card-title">Total Work Days</h5>
+                    <h2>{{ stats|sum(attribute='total_days') }}</h2>
+                    <small>Combined attendance</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-info text-white">
+                <div class="card-body">
+                    <h5 class="card-title">Avg Attendance Rate</h5>
+                    <h2>
+                        {% set total_rate = namespace(value=0) %}
+                        {% for s in stats %}
+                            {% set total_rate.value = total_rate.value + s.attendance_rate %}
+                        {% endfor %}
+                        {{ (total_rate.value / stats|length)|round if stats|length > 0 else 0 }}%
+                    </h2>
+                    <small>Overall attendance</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-warning text-dark">
+                <div class="card-body">
+                    <h5 class="card-title">Incomplete Attendance</h5>
+                    <h2>{{ stats|sum(attribute='signed_in_no_signout') }}</h2>
+                    <small>No sign-out recorded</small>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Summary Cards Row 2 - Performance Stats -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white;">
+                <div class="card-body">
+                    <h5 class="card-title">Avg Punctuality</h5>
+                    <h2>
+                        {% set total_punct = namespace(value=0) %}
+                        {% for s in stats %}
+                            {% set total_punct.value = total_punct.value + s.punctuality_rate %}
+                        {% endfor %}
+                        {{ (total_punct.value / stats|length)|round if stats|length > 0 else 0 }}%
+                    </h2>
+                    <small>On time or early</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card" style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); color: white;">
+                <div class="card-body">
+                    <h5 class="card-title">Avg Stay Rate</h5>
+                    <h2>
+                        {% set total_stay = namespace(value=0) %}
+                        {% for s in stats %}
+                            {% set total_stay.value = total_stay.value + s.stay_rate %}
+                        {% endfor %}
+                        {{ (total_stay.value / stats|length)|round if stats|length > 0 else 0 }}%
+                    </h2>
+                    <small>Stayed till 4:30 PM</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-danger text-white">
+                <div class="card-body">
+                    <h5 class="card-title">Total Late</h5>
+                    <h2>{{ stats|sum(attribute='late_count') }}</h2>
+                    <small>After 8:30 AM</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-secondary text-white">
+                <div class="card-body">
+                    <h5 class="card-title">Total Left Early</h5>
+                    <h2>{{ stats|sum(attribute='left_early_count') }}</h2>
+                    <small>Before 4:30 PM</small>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Summary Cards Row 3 - Quality Stats -->
+    <div class="row mb-4">
+        <div class="col-md-4">
+            <div class="card bg-success text-white">
+                <div class="card-body">
+                    <h5 class="card-title">Avg Face Quality</h5>
+                    <h2>
+                        {% set total_quality = namespace(value=0) %}
+                        {% for s in stats %}
+                            {% set total_quality.value = total_quality.value + s.avg_face_quality %}
+                        {% endfor %}
+                        {{ (total_quality.value / stats|length)|round if stats|length > 0 else 0 }}%
+                    </h2>
+                    <small>Image quality score</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card bg-info text-white">
+                <div class="card-body">
+                    <h5 class="card-title">Avg Confidence</h5>
+                    <h2>
+                        {% set total_conf = namespace(value=0) %}
+                        {% for s in stats %}
+                            {% set total_conf.value = total_conf.value + s.avg_confidence %}
+                        {% endfor %}
+                        {{ (total_conf.value / stats|length)|round if stats|length > 0 else 0 }}%
+                    </h2>
+                    <small>Face match score</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card bg-primary text-white">
+                <div class="card-body">
+                    <h5 class="card-title">Liveness Rate</h5>
+                    <h2>
+                        {% set total_liveness = namespace(value=0) %}
+                        {% for s in stats %}
+                            {% set total_liveness.value = total_liveness.value + s.liveness_rate %}
+                        {% endfor %}
+                        {{ (total_liveness.value / stats|length)|round if stats|length > 0 else 0 }}%
+                    </h2>
+                    <small>Real face detection</small>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Charts Row -->
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <div class="card shadow-sm p-3">
+                <h5>Time-in Distribution</h5>
+                <div style="position: relative; height: 300px;">
+                    <canvas id="timeInChart"></canvas>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card shadow-sm p-3">
+                <h5>Time-out Distribution</h5>
+                <div style="position: relative; height: 300px;">
+                    <canvas id="timeOutChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Detailed Data Table -->
+    <div class="card mt-4" id="dashboardTable">
+        <div class="card-header bg-light d-flex justify-content-between align-items-center">
+            <h5 class="mb-0">Employee Performance Summary</h5>
+            <span class="badge bg-primary">Showing {{ stats|length }} active employees</span>
+        </div>
+        <div class="card-body">
+            {% if stats and stats|length > 0 %}
+            <div class="table-responsive">
+                <table class="table table-hover table-bordered" id="dashboardDataTable">
+                    <thead class="table-dark">
+                        <tr>
+                            <th rowspan="2">Employee</th>
+                            <th rowspan="2">MDA</th>
+                            <th colspan="4" class="text-center bg-primary">Attendance</th>
+                            <th colspan="3" class="text-center bg-success">Time-in</th>
+                            <th colspan="3" class="text-center bg-warning">Time-out</th>
+                            <th colspan="3" class="text-center bg-info">Face Quality</th>
+                            <th rowspan="2">Actions</th>
+                        </tr>
+                        <tr>
+                            <th>Days</th>
+                            <th>In</th>
+                            <th>Out</th>
+                            <th>No Out</th>
+                            
+                            <th>Early</th>
+                            <th>Late</th>
+                            <th>On Time</th>
+                            
+                            <th>Left Early</th>
+                            <th>Stayed</th>
+                            <th>Exact</th>
+                            
+                            <th>Quality</th>
+                            <th>Confidence</th>
+                            <th>Liveness</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for s in stats %}
+                        <tr>
+                            <td><strong>{{ s.employee_name }}</strong></td>
+                            <td>{{ s.mda }}</td>
+                            
+                            <!-- Attendance -->
+                            <td class="text-center">{{ s.total_days }}</td>
+                            <td class="text-center">{{ s.signed_in_count }}</td>
+                            <td class="text-center">{{ s.signed_out_count }}</td>
+                            <td class="text-center">
+                                {% if s.signed_in_no_signout > 0 %}
+                                <span class="badge bg-warning">{{ s.signed_in_no_signout }}</span>
+                                {% else %}
+                                {{ s.signed_in_no_signout }}
+                                {% endif %}
+                            </td>
+                            
+                            <!-- Time-in -->
+                            <td class="text-center">
+                                {% if s.early_count > 0 %}
+                                <span class="badge bg-success">{{ s.early_count }}</span>
+                                {% else %}
+                                {{ s.early_count }}
+                                {% endif %}
+                            </td>
+                            <td class="text-center">
+                                {% if s.late_count > 0 %}
+                                <span class="badge bg-danger">{{ s.late_count }}</span>
+                                {% else %}
+                                {{ s.late_count }}
+                                {% endif %}
+                            </td>
+                            <td class="text-center">{{ s.ontime_count }}</td>
+                            
+                            <!-- Time-out -->
+                            <td class="text-center">
+                                {% if s.left_early_count > 0 %}
+                                <span class="badge bg-warning">{{ s.left_early_count }}</span>
+                                {% else %}
+                                {{ s.left_early_count }}
+                                {% endif %}
+                            </td>
+                            <td class="text-center">
+                                {% if s.stayed_till_close_count > 0 %}
+                                <span class="badge bg-success">{{ s.stayed_till_close_count }}</span>
+                                {% else %}
+                                {{ s.stayed_till_close_count }}
+                                {% endif %}
+                            </td>
+                            <td class="text-center">{{ s.exact_timeout_count }}</td>
+                            
+                            <!-- Quality Metrics -->
+                            <td class="text-center">
+                                <div class="progress" style="height: 20px; min-width: 80px;" title="{{ s.avg_face_quality }}% avg quality">
+                                    <div class="progress-bar {% if s.avg_face_quality > 70 %}bg-success
+                                        {% elif s.avg_face_quality > 40 %}bg-warning
+                                        {% else %}bg-danger{% endif %}" 
+                                        style="width: {{ s.avg_face_quality }}%">
+                                        {{ s.avg_face_quality }}%
+                                    </div>
+                                </div>
+                            </td>
+                            <td class="text-center">
+                                <div class="progress" style="height: 20px; min-width: 80px;" title="{{ s.avg_confidence }}% avg confidence">
+                                    <div class="progress-bar {% if s.avg_confidence > 70 %}bg-success
+                                        {% elif s.avg_confidence > 40 %}bg-warning
+                                        {% else %}bg-danger{% endif %}" 
+                                        style="width: {{ s.avg_confidence }}%">
+                                        {{ s.avg_confidence }}%
+                                    </div>
+                                </div>
+                            </td>
+                            <td class="text-center">
+                                <span class="badge {% if s.liveness_rate > 80 %}bg-success
+                                    {% elif s.liveness_rate > 50 %}bg-warning
+                                    {% else %}bg-danger{% endif %}">
+                                    {{ s.liveness_rate }}%
+                                </span>
+                            </td>
+                            
+                            <td>
+                                <a href="{{ s.trace_link }}" class="btn btn-sm btn-outline-primary">
+                                    <i class="fas fa-chart-line"></i> Trace
+                                </a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="text-center py-5">
+                <div class="display-1 text-muted mb-4">📊</div>
+                <h4>No attendance data available</h4>
+                <p class="text-muted mb-4">Start by taking attendance or registering employees</p>
+                <div class="d-flex justify-content-center gap-3">
+                    <a href="{{ url_for('take_attendance') }}" class="btn btn-primary btn-lg">
+                        <i class="fas fa-camera"></i> Take Attendance
+                    </a>
+                    <a href="{{ url_for('register') }}" class="btn btn-success btn-lg">
+                        <i class="fas fa-user-plus"></i> Register Employee
+                    </a>
+                </div>
+            </div>
+            {% endif %}
         </div>
     </div>
 </div>
 
-<!-- Chart.js and DataLabels Plugin CDN -->
+<!-- Chart.js -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2"></script>
+<!-- html2pdf library -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 
 <script>
+function refreshDashboard() {
+    window.location.reload(true);
+}
+
+function downloadDashboardPDF() {
+    const element = document.querySelector('.container.mt-4');
+    
+    // Store original styles
+    const originalStyles = [];
+    const cards = document.querySelectorAll('.card');
+    cards.forEach((card, index) => {
+        originalStyles[index] = card.style.background;
+    });
+    
+    const opt = {
+        margin: [0.5, 0.5, 0.5, 0.5],
+        filename: 'Attendance_Dashboard_Report.pdf',
+        image: { type: 'jpeg', quality: 0.98 },
+        html2canvas: { 
+            scale: 2, 
+            logging: false, 
+            letterRendering: true,
+            scrollY: 0,
+            windowHeight: element.scrollHeight
+        },
+        jsPDF: { 
+            unit: 'in', 
+            format: 'a4', 
+            orientation: 'landscape'
+        }
+    };
+    
+    // Generate and save PDF
+    html2pdf().set(opt).from(element).save();
+}
+
 document.addEventListener('DOMContentLoaded', function() {
-    const ctx = document.getElementById('attendanceChart').getContext('2d');
-
-    const labels = {{ stats|map(attribute='employee_name')|list|tojson }};
-    const signedInData = {{ stats|map(attribute='signed_in_count')|list|tojson }};
-    const signedOutData = {{ stats|map(attribute='signed_out_count')|list|tojson }};
-    const noSignoutData = {{ stats|map(attribute='signed_in_no_signout')|list|tojson }};
-    const lateData = {{ stats|map(attribute='late_count')|list|tojson }};
-
-    new Chart(ctx, {
+    {% if stats and stats|length > 0 %}
+    
+    // Time-in Chart
+    const timeInCtx = document.getElementById('timeInChart').getContext('2d');
+    new Chart(timeInCtx, {
         type: 'bar',
         data: {
-            labels: labels,
+            labels: {{ stats|map(attribute='employee_name')|list|tojson }},
             datasets: [
                 {
-                    label: 'Signed In',
-                    data: signedInData,
-                    backgroundColor: '#28a745',
-                    stack: 'attendance'
+                    label: 'Early (Before 8:30)',
+                    data: {{ stats|map(attribute='early_count')|list|tojson }},
+                    backgroundColor: '#28a745'
                 },
                 {
-                    label: 'Signed Out',
-                    data: signedOutData,
-                    backgroundColor: '#007bff',
-                    stack: 'attendance'
+                    label: 'On Time (8:30)',
+                    data: {{ stats|map(attribute='ontime_count')|list|tojson }},
+                    backgroundColor: '#17a2b8'
                 },
                 {
-                    label: 'No Signout',
-                    data: noSignoutData,
-                    backgroundColor: '#ffc107',
-                    stack: 'attendance'
-                },
-                {
-                    label: 'Late',
-                    data: lateData,
-                    backgroundColor: '#dc3545',
-                    stack: 'attendance'
+                    label: 'Late (After 8:30)',
+                    data: {{ stats|map(attribute='late_count')|list|tojson }},
+                    backgroundColor: '#dc3545'
                 }
             ]
         },
@@ -60,43 +405,101 @@ document.addEventListener('DOMContentLoaded', function() {
             responsive: true,
             maintainAspectRatio: false,
             plugins: {
-                legend: { position: 'top' },
-                datalabels: {
-                    color: '#000',
-                    font: { weight: 'bold' },
-                    formatter: function(value, context) {
-                        // Sum all stacks for this bar to show total on top
-                        let sum = 0;
-                        const datasets = context.chart.data.datasets;
-                        for (let i = 0; i < datasets.length; i++) {
-                            sum += datasets[i].data[context.dataIndex];
-                        }
-                        // Show sum only for last dataset's label
-                        if (context.datasetIndex === datasets.length - 1) {
-                            return 'Total: ' + sum;
-                        } else {
-                            return '';
-                        }
-                    },
-                    anchor: 'end',
-                    align: 'start',
-                    offset: -10
-                }
+                legend: { position: 'top' }
             },
             scales: {
-                x: {
-                    stacked: true,
-                    ticks: { maxRotation: 45 }
-                },
                 y: {
-                    stacked: true,
                     beginAtZero: true,
                     ticks: { stepSize: 1 }
                 }
             }
-        },
-        plugins: [ChartDataLabels]
+        }
     });
+    
+    // Time-out Chart
+    const timeOutCtx = document.getElementById('timeOutChart').getContext('2d');
+    new Chart(timeOutCtx, {
+        type: 'bar',
+        data: {
+            labels: {{ stats|map(attribute='employee_name')|list|tojson }},
+            datasets: [
+                {
+                    label: 'Left Early (Before 4:30)',
+                    data: {{ stats|map(attribute='left_early_count')|list|tojson }},
+                    backgroundColor: '#ffc107'
+                },
+                {
+                    label: 'Exact (4:30)',
+                    data: {{ stats|map(attribute='exact_timeout_count')|list|tojson }},
+                    backgroundColor: '#17a2b8'
+                },
+                {
+                    label: 'Stayed (After 4:30)',
+                    data: {{ stats|map(attribute='stayed_till_close_count')|list|tojson }},
+                    backgroundColor: '#28a745'
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { position: 'top' }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: { stepSize: 1 }
+                }
+            }
+        }
+    });
+    
+    {% endif %}
 });
 </script>
+
+<style>
+.card {
+    transition: transform 0.2s;
+    border: none;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+.card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+}
+.table th {
+    white-space: nowrap;
+    text-align: center;
+    vertical-align: middle;
+}
+.table td {
+    vertical-align: middle;
+}
+.progress {
+    border-radius: 10px;
+    background-color: #e9ecef;
+}
+.progress-bar {
+    border-radius: 10px;
+    font-size: 11px;
+    font-weight: bold;
+    line-height: 20px;
+}
+.badge {
+    font-size: 0.75rem;
+    padding: 0.35rem 0.65rem;
+}
+
+/* PDF Optimization */
+@media print {
+    .btn, .navbar, .container > .d-flex .btn {
+        display: none !important;
+    }
+    .card {
+        break-inside: avoid;
+    }
+}
+</style>
 {% endblock %}

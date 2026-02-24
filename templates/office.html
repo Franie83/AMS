@@ -3,20 +3,36 @@
 <div class="row g-4">
     <div class="col-12">
         <div class="card shadow">
-            <div class="card-header bg-primary text-white">
+            <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
                 <h3 class="card-title mb-0">
-                    <i class="fas fa-building me-2"></i>[translate:Office Today]
+                    <i class="fas fa-building me-2"></i>Office Today
                 </h3>
-                <span class="badge bg-light text-dark fs-6 ms-2">{{ employees|length }} [translate:Currently In]</span>
+                <span class="badge bg-light text-dark fs-6">{{ employees|length }} Currently In Office</span>
             </div>
             <div class="card-body">
                 {% if employees %}
+                    <div class="alert alert-info mb-3">
+                        <i class="fas fa-info-circle me-2"></i>
+                        <strong>Click on any employee card</strong> to view detailed attendance receipt with PDF download and sharing options.
+                    </div>
+                    
                     {% for emp in employees %}
-                    <div class="row mb-3 p-3 border rounded bg-light" id="emp-row-{{ emp.id }}">
+                    <div class="row mb-3 p-3 border rounded bg-light office-row" 
+                         data-id="{{ emp.id }}" 
+                         data-employeeid="{{ emp.Employee.employeeid if emp.Employee else '' }}"
+                         data-name="{{ emp.employee_name }}"
+                         data-mda="{{ emp.mda }}"
+                         data-timein="{{ emp.time_in.strftime('%H:%M:%S') if emp.time_in else '' }}"
+                         data-signinimage="{{ emp.signin_image }}"
+                         data-regimage="{{ emp.Employee.registered_image if emp.Employee else '' }}"
+                         data-signinmatch="{{ emp.reg_signin_match }}"
+                         data-signinconfidence="{{ emp.signin_confidence }}"
+                         style="cursor: pointer; transition: all 0.2s;">
+                        
                         <div class="col-md-2 text-center">
                             <div class="avatar">
-                                {% if emp.registered_image %}
-                                <img height="60" src="{{ url_for('uploads', filename=emp.registered_image.split('/')[-1]) }}" class="rounded-circle shadow-sm" alt="[translate:Registered Photo]">
+                                {% if emp.Employee and emp.Employee.registered_image %}
+                                <img height="60" src="{{ url_for('uploads', filename=emp.Employee.registered_image.split('/')[-1]) }}" class="rounded-circle shadow-sm" alt="Registered Photo" onclick="showImage(this.src); event.stopPropagation();">
                                 {% else %}
                                 <div class="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center" style="width:60px;height:60px;font-size:1.2rem;">
                                     {{ emp.employee_name.split(' ')[0][0] }}
@@ -25,29 +41,39 @@
                             </div>
                             <small class="text-muted mt-1 d-block">{{ emp.employee_name.split(' ')[0] }}</small>
                         </div>
+                        
                         <div class="col-md-3">
                             <strong>{{ emp.employee_name }}</strong><br>
-                            <small class="text-muted">{{ emp.mda or '[translate:N/A]' }}</small>
+                            <small class="text-muted">{{ emp.mda or 'N/A' }}</small>
+                            <br>
+                            <small class="text-muted">ID: {{ emp.Employee.employeeid if emp.Employee else 'N/A' }}</small>
                         </div>
+                        
                         <div class="col-md-2">
-                            <strong>[translate:Sign In]</strong><br>
+                            <strong>Sign In</strong><br>
                             <span class="badge bg-success">{{ emp.time_in.strftime('%H:%M') if emp.time_in else '-' }}</span>
+                            {% if emp.signin_confidence %}
+                            <br><small class="text-muted">Conf: {{ (emp.signin_confidence * 100)|round }}%</small>
+                            {% endif %}
                         </div>
+                        
                         <div class="col-md-2">
-                            <strong>[translate:Sign Out]</strong><br>
-                            <span class="badge bg-warning text-dark">⏳ [translate:Pending]</span>
+                            <strong>Sign Out</strong><br>
+                            <span class="badge bg-warning text-dark">⏳ Pending</span>
                         </div>
+                        
                         <div class="col-md-2">
-                            <div>
-                                {% if emp.registered_image %}
-                                <img height="30" class="me-1" src="{{ url_for('uploads', filename=emp.registered_image.split('/')[-1]) }}" alt="[translate:Registered Photo]">
+                            <div class="d-flex gap-1">
+                                {% if emp.Employee and emp.Employee.registered_image %}
+                                <img height="30" class="me-1 border rounded" src="{{ url_for('uploads', filename=emp.Employee.registered_image.split('/')[-1]) }}" alt="Registered" onclick="showImage(this.src); event.stopPropagation();">
                                 {% endif %}
                                 {% if emp.signin_image %}
-                                <img height="30" src="{{ url_for('uploads', filename=emp.signin_image.split('/')[-1]) }}" alt="[translate:Sign In Photo]">
+                                <img height="30" class="border rounded" src="{{ url_for('uploads', filename=emp.signin_image.split('/')[-1]) }}" alt="Sign In" onclick="showImage(this.src); event.stopPropagation();">
                                 {% endif %}
                             </div>
                         </div>
-                        <div class="col-md-1 text-center">
+                        
+                        <div class="col-md-1 text-center" onclick="event.stopPropagation();">
                             <button class="btn btn-sm btn-outline-danger delete-office-btn" 
                                     data-id="{{ emp.id }}"
                                     data-name="{{ emp.employee_name }}">
@@ -59,8 +85,8 @@
                 {% else %}
                     <div class="text-center py-5">
                         <i class="fas fa-building fa-4x text-muted mb-4"></i>
-                        <h4 class="text-muted">[translate:Office is Empty]</h4>
-                        <p class="text-muted">[translate:No employees currently signed in]</p>
+                        <h4 class="text-muted">Office is Empty</h4>
+                        <p class="text-muted">No employees currently signed in</p>
                     </div>
                 {% endif %}
             </div>
@@ -68,29 +94,358 @@
     </div>
 </div>
 
-<!-- ✅ DELETE MODAL (one at bottom) -->
+<!-- Office Receipt Modal -->
+<div class="modal fade" id="officeReceiptModal" tabindex="-1" aria-labelledby="officeReceiptModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title" id="officeReceiptModalLabel">
+                    <i class="fas fa-building me-2"></i>CURRENT ATTENDANCE DETAILS
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body" id="officeReceiptContent">
+                <div class="text-center mb-4">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                    <p>Loading details...</p>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <div class="btn-group w-100" role="group">
+                    <button class="btn btn-success" onclick="downloadOfficePDF()">
+                        <i class="fas fa-file-pdf me-2"></i>Download PDF
+                    </button>
+                    <button class="btn btn-info" onclick="shareOfficePDF('whatsapp')">
+                        <i class="fab fa-whatsapp me-2"></i>WhatsApp
+                    </button>
+                    <button class="btn btn-primary" onclick="shareOfficePDF('telegram')">
+                        <i class="fab fa-telegram me-2"></i>Telegram
+                    </button>
+                    <button class="btn btn-secondary" onclick="shareOfficePDF('email')">
+                        <i class="fas fa-envelope me-2"></i>Email
+                    </button>
+                </div>
+                <button type="button" class="btn btn-secondary w-100 mt-2" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Image Modal -->
+<div class="modal fade" id="imageModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Employee Photo</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body text-center">
+                <img id="modalImage" src="" class="img-fluid rounded">
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Delete Modal -->
 <div class="modal fade" id="deleteModal" tabindex="-1">
     <div class="modal-dialog">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title text-danger"><i class="fas fa-trash me-2"></i>[translate:Confirm Delete]</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="[translate:Close]"></button>
+                <h5 class="modal-title text-danger"><i class="fas fa-trash me-2"></i>Confirm Delete</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
-                <p>[translate:Remove] <strong id="deleteEmpName"></strong> [translate:from office?]</p>
-                <p class="text-muted small">[translate:This deletes today's attendance record.]</p>
+                <p>Remove <strong id="deleteEmpName"></strong> from office?</p>
+                <p class="text-muted small">This deletes today's attendance record.</p>
             </div>
             <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">[translate:Cancel]</button>
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
                 <button type="button" class="btn btn-danger" id="confirmDeleteBtn">
-                    <i class="fas fa-trash me-1"></i>[translate:Remove]
+                    <i class="fas fa-trash me-1"></i>Remove
                 </button>
             </div>
         </div>
     </div>
 </div>
 
+<!-- Add Font Awesome if not already in layout -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+<!-- html2pdf library -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+
 <script>
+let imageModal;
+let currentOfficeData = null;
+let currentReceiptElement = null;
+const MATCH_THRESHOLD = 65; // 65% threshold
+
+document.addEventListener('DOMContentLoaded', function() {
+    imageModal = new bootstrap.Modal(document.getElementById('imageModal'));
+    
+    // Make office rows clickable
+    document.querySelectorAll('.office-row').forEach(row => {
+        row.addEventListener('click', function(e) {
+            // Don't trigger if clicking on buttons or images
+            if (e.target.tagName === 'BUTTON' || 
+                e.target.tagName === 'A' || 
+                e.target.tagName === 'I' ||
+                e.target.closest('button') ||
+                e.target.tagName === 'IMG') {
+                return;
+            }
+            
+            // Get data from data attributes
+            const data = {
+                id: this.dataset.id,
+                employee_name: this.dataset.name,
+                employee_id: this.dataset.employeeid,
+                mda: this.dataset.mda,
+                time_in: this.dataset.timein,
+                signin_image: this.dataset.signinimage,
+                reg_image: this.dataset.regimage,
+                signin_match: this.dataset.signinmatch === 'True',
+                signin_confidence: this.dataset.signinconfidence ? (parseFloat(this.dataset.signinconfidence) * 100).toFixed(1) : '0'
+            };
+            
+            showOfficeReceipt(data);
+        });
+    });
+});
+
+function showImage(src) {
+    document.getElementById('modalImage').src = src;
+    imageModal.show();
+}
+
+function showOfficeReceipt(data) {
+    const modal = new bootstrap.Modal(document.getElementById('officeReceiptModal'));
+    const content = document.getElementById('officeReceiptContent');
+    
+    // Show loading
+    content.innerHTML = `
+        <div class="text-center mb-4">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+            <p>Loading details...</p>
+        </div>
+    `;
+    
+    modal.show();
+    
+    try {
+        currentOfficeData = data;
+        
+        // Generate receipt HTML
+        const receiptHTML = generateOfficeReceiptHTML(data);
+        content.innerHTML = receiptHTML;
+        
+        // Store reference to receipt element for PDF generation
+        currentReceiptElement = content.querySelector('.receipt-container');
+        
+    } catch (error) {
+        content.innerHTML = `
+            <div class="alert alert-danger">
+                <i class="fas fa-exclamation-triangle me-2"></i>
+                Error loading details: ${error.message}
+            </div>
+        `;
+    }
+}
+
+function generateOfficeReceiptHTML(data) {
+    const signinMatch = parseFloat(data.signin_confidence) >= MATCH_THRESHOLD;
+    const currentTime = new Date().toLocaleTimeString();
+    
+    return `
+        <div class="receipt-container" style="font-family: 'Courier New', monospace; background: white; padding: 20px; border-radius: 10px; max-width: 100%;">
+            <!-- Header -->
+            <div class="text-center mb-4">
+                <h4 style="color: #0d6efd; margin: 0;">🏢 CURRENT ATTENDANCE STATUS</h4>
+                <div style="border-bottom: 2px dashed #0d6efd; margin: 10px 0;"></div>
+                <small style="color: #6c757d;">Record ID: ${data.id} | ${new Date().toLocaleDateString()}</small>
+                <div class="mt-2">
+                    <span style="display: inline-block; background: #17a2b8; color: white; padding: 3px 8px; border-radius: 20px; font-size: 12px;">Currently In Office</span>
+                </div>
+            </div>
+            
+            <!-- Employee Details -->
+            <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; margin-bottom: 15px;">
+                <table style="width: 100%; border-collapse: collapse;">
+                    <tr>
+                        <td style="padding: 6px; font-weight: bold; width: 100px;">Employee:</td>
+                        <td style="padding: 6px;">${data.employee_name}</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 6px; font-weight: bold;">ID:</td>
+                        <td style="padding: 6px;">${data.employee_id || 'N/A'}</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 6px; font-weight: bold;">MDA:</td>
+                        <td style="padding: 6px;">${data.mda || 'N/A'}</td>
+                    </tr>
+                </table>
+            </div>
+            
+            <!-- Times -->
+            <div style="background: white; padding: 15px; border-radius: 8px; margin-bottom: 15px; border: 1px solid #dee2e6;">
+                <div style="text-align: center;">
+                    <strong>⏰ Sign In Time</strong><br>
+                    <span style="font-size: 1.5rem; font-weight: bold; color: #28a745;">${data.time_in}</span>
+                </div>
+                <div style="text-align: center; margin-top: 10px;">
+                    <strong>Current Time</strong><br>
+                    <span style="font-size: 1.2rem;">${currentTime}</span>
+                </div>
+            </div>
+            
+            <!-- Face Images -->
+            <div style="display: flex; gap: 10px; margin-bottom: 20px;">
+                <div style="flex: 1; text-align: center;">
+                    <strong>Registered</strong><br>
+                    ${data.reg_image ? 
+                        `<img src="/uploads/${data.reg_image.split('/').pop()}" style="max-width: 100%; height: 100px; object-fit: cover; border-radius: 5px; border: 2px solid #0d6efd;" onclick="showImage('/uploads/${data.reg_image.split('/').pop()}')">` : 
+                        '<div style="background: #6c757d; color: white; padding: 10px; border-radius: 5px;">No Image</div>'}
+                </div>
+                <div style="flex: 1; text-align: center;">
+                    <strong>Sign In</strong><br>
+                    ${data.signin_image ? 
+                        `<img src="/uploads/${data.signin_image.split('/').pop()}" style="max-width: 100%; height: 100px; object-fit: cover; border-radius: 5px; ${!signinMatch ? 'border: 3px solid #dc3545;' : 'border: 2px solid #28a745;'}" onclick="showImage('/uploads/${data.signin_image.split('/').pop()}')">` : 
+                        '<div style="background: #6c757d; color: white; padding: 10px; border-radius: 5px;">No Image</div>'}
+                </div>
+                <div style="flex: 1; text-align: center;">
+                    <strong>Sign Out</strong><br>
+                    <div style="background: #ffc107; color: #000; padding: 10px; border-radius: 5px;">
+                        ⏳ Pending
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Face Recognition Stats -->
+            <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; margin-bottom: 15px;">
+                <h6 style="color: #0d6efd; margin: 0 0 10px 0;">🔍 Face Recognition Analysis</h6>
+                <div>
+                    <strong>Sign In Confidence:</strong><br>
+                    <div style="background: #e9ecef; height: 20px; border-radius: 10px; overflow: hidden; margin-top: 5px;">
+                        <div style="height: 100%; width: ${data.signin_confidence}%; background-color: ${signinMatch ? '#28a745' : '#dc3545'}; text-align: center; color: white; font-size: 12px; line-height: 20px;">
+                            ${data.signin_confidence}%
+                        </div>
+                    </div>
+                    <small>Match: ${signinMatch ? '✅' : '❌'} (Threshold: ${MATCH_THRESHOLD}%)</small>
+                </div>
+                <div style="margin-top: 10px;">
+                    <strong>Status:</strong> Currently signed in - waiting for sign out
+                </div>
+            </div>
+            
+            <!-- Footer -->
+            <div style="text-align: center;">
+                <div style="border-top: 1px dashed #0d6efd; padding-top: 10px;">
+                    <small style="color: #6c757d;">
+                        Generated on ${new Date().toLocaleString()}<br>
+                        This is a real-time attendance status report.
+                    </small>
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+function downloadOfficePDF() {
+    if (!currentReceiptElement) {
+        alert('No report to download');
+        return;
+    }
+    
+    const employeeName = currentOfficeData ? currentOfficeData.employee_name : 'attendance';
+    const filename = `${employeeName}_Current_Attendance.pdf`.replace(/\s+/g, '_');
+    
+    const opt = {
+        margin: [0.5, 0.5, 0.5, 0.5],
+        filename: filename,
+        image: { type: 'jpeg', quality: 0.98 },
+        html2canvas: { scale: 2, logging: false, letterRendering: true },
+        jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' }
+    };
+    
+    html2pdf().set(opt).from(currentReceiptElement).save();
+}
+
+function shareOfficePDF(platform) {
+    if (!currentReceiptElement) {
+        alert('No report to share');
+        return;
+    }
+    
+    const employeeName = currentOfficeData ? currentOfficeData.employee_name : 'attendance';
+    const filename = `${employeeName}_Current_Attendance.pdf`.replace(/\s+/g, '_');
+    
+    // Generate PDF as blob
+    const opt = {
+        margin: [0.5, 0.5, 0.5, 0.5],
+        filename: filename,
+        image: { type: 'jpeg', quality: 0.98 },
+        html2canvas: { scale: 2, logging: false, letterRendering: true },
+        jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' }
+    };
+    
+    html2pdf().set(opt).from(currentReceiptElement).outputPdf().then((pdfBlob) => {
+        // Create a blob URL
+        const blob = new Blob([pdfBlob], { type: 'application/pdf' });
+        const url = URL.createObjectURL(blob);
+        
+        const signinMatch = parseFloat(currentOfficeData.signin_confidence) >= MATCH_THRESHOLD;
+        
+        if (platform === 'whatsapp') {
+            const shareText = `🏢 CURRENT ATTENDANCE STATUS
+━━━━━━━━━━━━━━━━━━
+Employee: ${employeeName}
+ID: ${currentOfficeData.employee_id || 'N/A'}
+MDA: ${currentOfficeData.mda || 'N/A'}
+━━━━━━━━━━━━━━━━━━
+⏰ Sign In Time: ${currentOfficeData.time_in}
+Status: Currently In Office (Pending Sign Out)
+━━━━━━━━━━━━━━━━━━
+🔍 Face Recognition:
+Sign In Confidence: ${currentOfficeData.signin_confidence}%
+Match: ${signinMatch ? '✅' : '❌'} (Threshold: ${MATCH_THRESHOLD}%)
+━━━━━━━━━━━━━━━━━━`;
+            window.open(`https://wa.me/?text=${encodeURIComponent(shareText)}`, '_blank');
+            alert('PDF generated. Please download and share via WhatsApp manually.');
+            downloadOfficePDF();
+            
+        } else if (platform === 'telegram') {
+            const shareText = `🏢 CURRENT ATTENDANCE STATUS
+━━━━━━━━━━━━━━━━━━
+Employee: ${employeeName}
+ID: ${currentOfficeData.employee_id || 'N/A'}
+MDA: ${currentOfficeData.mda || 'N/A'}
+━━━━━━━━━━━━━━━━━━
+⏰ Sign In Time: ${currentOfficeData.time_in}
+Status: Currently In Office (Pending Sign Out)
+━━━━━━━━━━━━━━━━━━
+🔍 Face Recognition:
+Sign In Confidence: ${currentOfficeData.signin_confidence}%
+Match: ${signinMatch ? '✅' : '❌'} (Threshold: ${MATCH_THRESHOLD}%)
+━━━━━━━━━━━━━━━━━━`;
+            window.open(`https://t.me/share/url?url=${encodeURIComponent(shareText)}`, '_blank');
+            alert('PDF generated. Please download and share via Telegram manually.');
+            downloadOfficePDF();
+            
+        } else if (platform === 'email') {
+            // Create mailto link with subject and body
+            const subject = `Current Attendance: ${employeeName} - In Office`;
+            const body = `CURRENT ATTENDANCE STATUS\n\nEmployee: ${employeeName}\nID: ${currentOfficeData.employee_id || 'N/A'}\nMDA: ${currentOfficeData.mda || 'N/A'}\n\n⏰ Sign In Time: ${currentOfficeData.time_in}\nStatus: Currently In Office (Pending Sign Out)\n\n🔍 FACE RECOGNITION:\nSign In Confidence: ${currentOfficeData.signin_confidence}%\nMatch: ${signinMatch ? 'MATCH' : 'MISMATCH'}\nThreshold: ${MATCH_THRESHOLD}%\n\nThis is a real-time attendance status report.`;
+            window.location.href = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+            alert('PDF generated. Please attach the downloaded PDF to your email.');
+            downloadOfficePDF();
+        }
+    });
+}
+
+// Delete functionality
 document.addEventListener('DOMContentLoaded', function() {
     const deleteBtns = document.querySelectorAll('.delete-office-btn');
     const modal = new bootstrap.Modal(document.getElementById('deleteModal'));
@@ -125,18 +480,42 @@ document.addEventListener('DOMContentLoaded', function() {
                     row.remove();
                     const badge = document.querySelector('.badge');
                     let count = parseInt(badge.textContent);
-                    badge.textContent = (count - 1) + (count > 1 ? ' [translate:Currently In]' : ' [translate:Currently In]');
+                    badge.textContent = (count - 1) + (count > 1 ? ' Currently In Office' : ' Currently In Office');
                 }, 300);
                 modal.hide();
             } else {
-                alert(data.msg || '[translate:Error occurred]');
+                alert(data.msg || 'Error occurred');
             }
         })
         .catch(err => {
-            alert('[translate:Network error]');
+            alert('Network error');
             console.error(err);
         });
     });
 });
 </script>
+
+<style>
+.office-row:hover {
+    background-color: rgba(13, 110, 253, 0.1) !important;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    transition: all 0.2s;
+}
+.receipt-container {
+    font-family: 'Courier New', monospace;
+}
+.receipt-container img {
+    cursor: pointer;
+    transition: transform 0.2s;
+}
+.receipt-container img:hover {
+    transform: scale(1.5);
+    z-index: 100;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+}
+.modal-lg {
+    max-width: 700px;
+}
+</style>
 {% endblock %}

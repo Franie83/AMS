@@ -1,5 +1,45 @@
-venv/ 
-__pycache__/ 
-*.pyc 
-.env 
-attendance.db 
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Virtual Environment
+venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+.virtualenvs/
+
+# Database
+*.db
+*.db-journal
+*.sqlite
+*.sqlite3
+attendance.db
+instance/
+
+# Environment variables
+.env
+.flaskenv
+.env.local
+.env.*.local
+
+# Uploads
+/uploads/*
+!/uploads/.gitkeep
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/

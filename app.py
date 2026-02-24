@@ -3,9 +3,7 @@ import io
 import base64
 from datetime import datetime, date, time
 from functools import wraps
-from flask import Flask, render_template, request, jsonify, make_response  # ✅ ADD make_response
-
-
+from flask import Flask, render_template, request, jsonify, make_response
 from flask import (
     Flask, render_template, request, redirect, url_for, flash,
     send_file, jsonify
@@ -21,6 +19,10 @@ import imagehash
 import pandas as pd
 from reportlab.lib.pagesizes import letter
 from reportlab.pdfgen import canvas
+import cv2
+import face_recognition
+from sqlalchemy import or_, inspect
+import numpy as np
 
 # ------------------------------
 # Config
@@ -40,18 +42,40 @@ login_manager = LoginManager(app)
 login_manager.login_view = "login"
 
 # ------------------------------
+# Context Processor for templates
+# ------------------------------
+@app.context_processor
+def utility_processor():
+    return {'now': datetime.now}
+
+# ------------------------------
 # Models
 # ------------------------------
 class User(UserMixin, db.Model):
     id = db.Column(db.Integer, primary_key=True)
     email = db.Column(db.String(150), unique=True, nullable=False)
     password_hash = db.Column(db.String(255), nullable=False)
-    role = db.Column(db.String(20), default='user')  # 'admin' or 'user'
+    role = db.Column(db.String(20), default='user')  # 'user', 'admin', 'superadmin'
     name = db.Column(db.String(150))
-    mda = db.Column(db.String(150), nullable=True)  # for user role scoping
+    mda = db.Column(db.String(150), nullable=True)
 
     def check_password(self, pwd):
         return check_password_hash(self.password_hash, pwd)
+    
+    def is_superadmin(self):
+        return self.role == 'superadmin'
+    
+    def is_admin(self):
+        return self.role == 'admin' or self.role == 'superadmin'
+    
+    def can_edit(self):
+        return self.role == 'superadmin'
+    
+    def can_delete(self):
+        return self.role == 'superadmin'
+    
+    def can_view_all(self):
+        return self.role in ['admin', 'superadmin']
 
 class Employee(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -61,7 +85,7 @@ class Employee(db.Model):
     email = db.Column(db.String(150))
     phone = db.Column(db.String(50))
     role = db.Column(db.String(50))
-    registered_image = db.Column(db.String(300))  # filepath
+    registered_image = db.Column(db.String(300))
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 class Timesheet(db.Model):
@@ -75,57 +99,206 @@ class Timesheet(db.Model):
     date = db.Column(db.Date, default=date.today)
     time_in = db.Column(db.Time, nullable=True)
     time_out = db.Column(db.Time, nullable=True)
-    # ADD THESE NEW COLUMNS:
     reg_signin_match = db.Column(db.Boolean, default=True)
     reg_signout_match = db.Column(db.Boolean, default=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    
+    signin_confidence = db.Column(db.Float, default=0.0)
+    signout_confidence = db.Column(db.Float, default=0.0)
+    signin_face_quality = db.Column(db.Float, default=0.0)
+    signout_face_quality = db.Column(db.Float, default=0.0)
+    signin_liveness_passed = db.Column(db.Boolean, default=False)
+    signout_liveness_passed = db.Column(db.Boolean, default=False)
 
 
 # ------------------------------
-# Utilities
+# Face Recognition Utilities
 # ------------------------------
 def save_base64_image(b64_data, prefix='img'):
+    """Save base64 image to file and return filename"""
     if not b64_data:
         return None
     if ',' in b64_data:
         _, b64 = b64_data.split(',', 1)
     else:
         b64 = b64_data
-    img_data = base64.b64decode(b64)
-    filename = f"{prefix}_{datetime.utcnow().strftime('%Y%m%d%H%M%S%f')}.png"
-    path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-    with open(path, 'wb') as f:
-        f.write(img_data)
-    return filename  # Return filename only
+    try:
+        img_data = base64.b64decode(b64)
+        filename = f"{prefix}_{datetime.utcnow().strftime('%Y%m%d%H%M%S%f')}.jpg"
+        path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+        with open(path, 'wb') as f:
+            f.write(img_data)
+        return filename
+    except Exception as e:
+        print(f"Error saving image: {e}")
+        return None
 
 
 def image_hash(path):
+    """Legacy perceptual hash function"""
     img = Image.open(path).convert('L').resize((256,256))
     return imagehash.phash(img)
 
-def images_mismatch(p1, p2):
-    # returns True if different by perceptual hash threshold
+
+def detect_and_encode_face(image_path):
+    """
+    Detect face in image and return encoding
+    Returns: (face_detected, face_encoding, face_location, quality_score)
+    """
     try:
-        h1 = image_hash(p1); h2 = image_hash(p2)
+        # Load image
+        img = face_recognition.load_image_file(image_path)
+        
+        # Detect face locations
+        face_locations = face_recognition.face_locations(img)
+        
+        if len(face_locations) == 0:
+            return False, None, None, 0
+        
+        # Get face encodings
+        face_encodings = face_recognition.face_encodings(img, face_locations)
+        
+        if len(face_encodings) == 0:
+            return False, None, None, 0
+        
+        # Calculate face quality (based on size and position)
+        face_location = face_locations[0]
+        top, right, bottom, left = face_location
+        face_width = right - left
+        face_height = bottom - top
+        img_height, img_width = img.shape[:2] if hasattr(img, 'shape') else (480, 640)
+        
+        # Quality score based on face size relative to image
+        face_area_ratio = (face_width * face_height) / (img_width * img_height)
+        quality_score = min(face_area_ratio * 10, 1.0)
+        
+        return True, face_encodings[0], face_location, quality_score
+        
+    except Exception as e:
+        print(f"Face detection error: {e}")
+        return False, None, None, 0
+
+
+def compare_faces(registered_encoding, captured_encoding, threshold=0.6):
+    """
+    Compare two face encodings
+    Returns: (match, confidence)
+    """
+    try:
+        if registered_encoding is None or captured_encoding is None:
+            return False, 0
+        
+        face_distance = face_recognition.face_distance([registered_encoding], captured_encoding)
+        confidence = 1 - face_distance[0]
+        
+        match = face_recognition.compare_faces([registered_encoding], captured_encoding, tolerance=0.6)[0]
+        
+        return match and confidence > threshold, confidence
+        
+    except Exception as e:
+        print(f"Face comparison error: {e}")
+        return False, 0
+
+
+def check_liveness(image_path):
+    """
+    Basic liveness detection using eye detection
+    """
+    try:
+        face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
+        eye_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_eye.xml')
+        
+        img = cv2.imread(image_path)
+        if img is None:
+            return False
+        
+        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+        
+        faces = face_cascade.detectMultiScale(gray, 1.3, 5)
+        
+        if len(faces) == 0:
+            return False
+        
+        for (x, y, w, h) in faces:
+            roi_gray = gray[y:y+h, x:x+w]
+            eyes = eye_cascade.detectMultiScale(roi_gray)
+            
+            if len(eyes) >= 2:
+                return True
+        
+        return False
+        
+    except Exception as e:
+        print(f"Liveness check error: {e}")
+        return False
+
+
+def images_mismatch(p1, p2):
+    """
+    Enhanced image comparison - tries face recognition first, falls back to perceptual hash
+    Returns True if images don't match
+    """
+    try:
+        detected1, encoding1, _, quality1 = detect_and_encode_face(p1)
+        detected2, encoding2, _, quality2 = detect_and_encode_face(p2)
+        
+        if detected1 and detected2 and encoding1 is not None and encoding2 is not None:
+            match, confidence = compare_faces(encoding1, encoding2)
+            return not match or confidence < 0.5
+        
+        h1 = image_hash(p1)
+        h2 = image_hash(p2)
         diff = h1 - h2
-        return diff > 30  # threshold, tweak as needed
-    except Exception:
+        return diff > 30
+    except Exception as e:
+        print(f"Image comparison error: {e}")
         return True
 
+
 def generate_employeeid(name):
+    """Generate employee ID from name"""
     parts = name.split()
     if len(parts) < 2:
         prefix = (parts[0][0] * 4).upper()
     else:
         prefix = (parts[0][0] + parts[0][-1] + parts[-1][0] + parts[-1][-1]).upper()
     
-    # Find highest existing number for this prefix
     existing = db.session.query(
         db.func.max(db.func.cast(db.func.substr(Employee.employeeid, -4), db.Integer))
     ).filter(Employee.employeeid.like(f"{prefix}%")).scalar()
     
     count = (existing or 0) + 1
     return f"{prefix}{count:04d}"
+
+
+def migrate_database():
+    """Add new columns to Timesheet table if they don't exist"""
+    with app.app_context():
+        try:
+            inspector = inspect(db.engine)
+            columns = [col['name'] for col in inspector.get_columns('timesheet')]
+            
+            new_columns = [
+                ('signin_confidence', 'FLOAT DEFAULT 0.0'),
+                ('signout_confidence', 'FLOAT DEFAULT 0.0'),
+                ('signin_face_quality', 'FLOAT DEFAULT 0.0'),
+                ('signout_face_quality', 'FLOAT DEFAULT 0.0'),
+                ('signin_liveness_passed', 'BOOLEAN DEFAULT 0'),
+                ('signout_liveness_passed', 'BOOLEAN DEFAULT 0')
+            ]
+            
+            for col_name, col_type in new_columns:
+                if col_name not in columns:
+                    db.session.execute(f'ALTER TABLE timesheet ADD COLUMN {col_name} {col_type}')
+                    print(f"Added column: {col_name}")
+            
+            db.session.commit()
+            print("Database migration completed successfully")
+            
+        except Exception as e:
+            print(f"Migration error: {e}")
+            db.session.rollback()
+
 
 # ------------------------------
 # Auth helpers
@@ -134,14 +307,62 @@ def generate_employeeid(name):
 def load_user(user_id):
     return User.query.get(int(user_id))
 
+
+def superadmin_required(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        if not current_user.is_authenticated or not current_user.is_superadmin():
+            flash("👑 Super Admin access required!", "danger")
+            return redirect(url_for('dashboard'))
+        return f(*args, **kwargs)
+    return decorated
+
+
 def admin_required(f):
     @wraps(f)
     def decorated(*args, **kwargs):
-        if not current_user.is_authenticated or current_user.role != 'admin':
+        if not current_user.is_authenticated or not current_user.is_admin():
             flash("Admin access required", "warning")
-            return redirect(url_for('index'))
+            return redirect(url_for('dashboard'))
         return f(*args, **kwargs)
     return decorated
+
+
+# ------------------------------
+# API Endpoints
+# ------------------------------
+@app.route('/detect_face', methods=['POST'])
+def detect_face_api():
+    """API endpoint for face detection during registration/attendance"""
+    try:
+        data = request.get_json()
+        image_data = data.get('image', '')
+        
+        if not image_data:
+            return jsonify({'face_detected': False, 'error': 'No image data'}), 400
+        
+        img_path = save_base64_image(image_data, prefix='temp_detect')
+        if not img_path:
+            return jsonify({'face_detected': False, 'error': 'Failed to save image'}), 500
+            
+        full_path = os.path.join(app.config['UPLOAD_FOLDER'], img_path)
+        
+        face_detected, encoding, location, quality = detect_and_encode_face(full_path)
+        liveness_passed = check_liveness(full_path) if face_detected else False
+        
+        if os.path.exists(full_path):
+            os.remove(full_path)
+        
+        return jsonify({
+            'face_detected': face_detected,
+            'quality': round(quality, 2),
+            'liveness_passed': liveness_passed,
+            'message': 'Face detected' if face_detected else 'No face detected'
+        })
+        
+    except Exception as e:
+        return jsonify({'face_detected': False, 'error': str(e)}), 500
+
 
 # ------------------------------
 # Routes
@@ -152,12 +373,27 @@ def index():
         return redirect(url_for('dashboard'))
     return redirect(url_for('login'))
 
+
 @app.route('/setup')
 def setup():
-    # create DB and admin user if not exists
-    # use app context to be safe if called from outside __main__
     with app.app_context():
         db.create_all()
+        migrate_database()
+        
+        # Create superadmin if not exists
+        superadmin = User.query.filter_by(email='superadmin@gmail.com').first()
+        if not superadmin:
+            superadmin = User(
+                email='superadmin@gmail.com',
+                password_hash=generate_password_hash('superadmin123'),
+                role='superadmin',
+                name='Super Administrator'
+            )
+            db.session.add(superadmin)
+            db.session.commit()
+            print("Super Admin created. Email: superadmin@gmail.com Password: superadmin123")
+        
+        # Create admin if not exists
         admin = User.query.filter_by(email='admin@gmail.com').first()
         if not admin:
             admin = User(
@@ -168,44 +404,46 @@ def setup():
             )
             db.session.add(admin)
             db.session.commit()
-            return "Admin user created: admin@gmail.com / admin123 - restart app and login"
+            print("Admin created. Email: admin@gmail.com Password: admin123")
+            
+        return "Super Admin and Admin users created. Check console for credentials."
     return "Setup has already been done."
+
 
 @app.route('/login', methods=['GET','POST'])
 def login():
     if request.method == 'POST':
-        # Check if admin login (existing User table)
         email = request.form['email'].strip()
-        password = request.form['phone'].strip()  # Use phone field for both
+        password = request.form['phone'].strip()
         
-        # FIRST: Try admin login (existing logic)
+        # Try user login
         user = User.query.filter_by(email=email).first()
         if user and user.check_password(password):
             login_user(user)
-            flash("Admin logged in successfully", "success")
+            role_emoji = "👑" if user.role == 'superadmin' else "🛡️" if user.role == 'admin' else "👤"
+            flash(f"{role_emoji} Welcome back {user.name}! ({user.role})", "success")
             return redirect(url_for('dashboard'))
         
-        # SECOND: Try employee login (email + phone)
+        # Try employee login
         employee = Employee.query.filter_by(email=email).first()
         if employee and employee.phone == password:
-            # Create/find linked User account for Flask-Login
             user = User.query.filter_by(email=email).first()
             if not user:
                 user = User(
                     email=email,
-                    password_hash=generate_password_hash(employee.phone),  # Hash phone for security
+                    password_hash=generate_password_hash(employee.phone),
                     name=employee.name,
                     mda=employee.mda,
-                    role='user'  # Employees get user role
+                    role='user'
                 )
                 db.session.add(user)
                 db.session.commit()
             
             login_user(user)
-            flash(f"Welcome back {employee.name}!", "success")
+            flash(f"👤 Welcome back {employee.name}!", "success")
             return redirect(url_for('dashboard'))
         
-        flash("❌ Invalid email or phone number", "danger")
+        flash("❌ Invalid email or password", "danger")
     
     return render_template('login.html')
 
@@ -217,49 +455,186 @@ def logout():
     flash("Logged out", "info")
     return redirect(url_for('login'))
 
+
 # ------------------------------
 # Register Employee
 # ------------------------------
-from flask import redirect, url_for
-
+# ------------------------------
+# Register Employee (UPDATED - better error handling)
+# ------------------------------
 @app.route('/register', methods=['GET', 'POST'])
 @login_required
 def register():
     if request.method == 'POST':
-        name = request.form['name'].strip()
-        mda = request.form.get('mda','').strip()
-        email = request.form.get('email','').strip()
-        phone = request.form.get('phone','').strip()
+        # Get raw form data first for debugging
+        raw_name = request.form.get('name', '')
+        raw_email = request.form.get('email', '')
+        raw_phone = request.form.get('phone', '')
+        
+        print(f"\n{'='*60}")
+        print(f"🔵 RAW FORM DATA RECEIVED:")
+        print(f"   Raw name: '{raw_name}'")
+        print(f"   Raw email: '{raw_email}'")
+        print(f"   Raw phone: '{raw_phone}'")
+        print(f"{'='*60}")
+        
+        # Clean the data
+        name = raw_name.strip()
+        email = raw_email.strip().lower()  # Convert to lowercase for consistency
+        phone = raw_phone.strip()
         role = 'user'  # Default role "user"
         
+        print(f"\n🔵 CLEANED DATA:")
+        print(f"   Cleaned name: '{name}'")
+        print(f"   Cleaned email: '{email}'")
+        print(f"   Cleaned phone: '{phone}'")
+        print(f"   Email length: {len(email)}")
+        print(f"   Email as bytes: {email.encode('utf-8')}")
+        
+        # AUTO-SET MDA from logged-in user's MDA
+        mda = current_user.mda if current_user.mda else ''
+        print(f"   MDA from user: '{mda}'")
+        
+        print(f"\n🔵 Registration attempt - Name: {name}, Email: {email}, Phone: {phone}, MDA: {mda}")
+        
+        # Check if email already exists in Employee table (with case-insensitive comparison)
+        print(f"\n🔍 Checking email in database: '{email}'")
+        
+        # First, get all emails from database for debugging
+        all_emails = Employee.query.with_entities(Employee.email).all()
+        db_emails = [e[0] for e in all_emails]
+        print(f"📧 All emails in database: {db_emails}")
+        
+        # Case-insensitive search
+        existing_employee = Employee.query.filter(Employee.email.ilike(email)).first()
+        
+        if existing_employee:
+            print(f"🔴 FOUND MATCH!")
+            print(f"   Database email: '{existing_employee.email}'")
+            print(f"   Database email length: {len(existing_employee.email)}")
+            print(f"   Database email as bytes: {existing_employee.email.encode('utf-8')}")
+            print(f"   Employee ID: {existing_employee.id}")
+            print(f"   Employee Name: {existing_employee.name}")
+            
+            error_msg = f"❌ Email {raw_email} is already registered to employee {existing_employee.name}"
+            flash(error_msg, "danger")
+            return render_template('register.html', 
+                                 name=name, 
+                                 email=raw_email,  # Return original raw email
+                                 phone=phone,
+                                 mda=mda)
+        else:
+            print(f"✅ Email '{email}' is available - no match found")
+        
+        # Check if phone already exists
+        print(f"\n🔍 Checking phone in database: '{phone}'")
+        existing_phone = Employee.query.filter_by(phone=phone).first()
+        if existing_phone:
+            print(f"🔴 Phone {phone} is already registered to employee {existing_phone.name}")
+            error_msg = f"❌ Phone {phone} is already registered to employee {existing_phone.name}"
+            flash(error_msg, "danger")
+            return render_template('register.html', 
+                                 name=name, 
+                                 email=raw_email, 
+                                 phone=phone,
+                                 mda=mda)
+        else:
+            print(f"✅ Phone '{phone}' is available")
+        
         try:
+            # Generate employee ID
             empid = generate_employeeid(name)
+            print(f"🟡 Generated Employee ID: {empid}")
+            
+            # Check if this ID already exists (just in case)
+            existing_id = Employee.query.filter_by(employeeid=empid).first()
+            if existing_id:
+                # Try generating a different ID by adding random number
+                import random
+                empid = f"{empid[:4]}{random.randint(1000, 9999)}"
+                print(f"🟡 ID existed, new generated ID: {empid}")
+            
             b64 = request.form.get('face_image')
             img_filename = None
-            if b64:
-                img_filename = save_base64_image(b64, prefix=f"registered_{empid}")
+            face_quality = 0
             
+            if b64:
+                print("🟡 Saving face image...")
+                img_filename = save_base64_image(b64, prefix=f"registered_{empid}")
+                if img_filename:
+                    print(f"🟢 Image saved: {img_filename}")
+                    # Validate the registered image has a face
+                    full_path = os.path.join(app.config['UPLOAD_FOLDER'], img_filename)
+                    face_detected, encoding, location, face_quality = detect_and_encode_face(full_path)
+                    
+                    if not face_detected:
+                        print("🔴 No face detected in image")
+                        if os.path.exists(full_path):
+                            os.remove(full_path)
+                        flash("❌ No face detected in the image. Please try again.", "danger")
+                        return render_template('register.html', 
+                                             name=name, 
+                                             email=raw_email, 
+                                             phone=phone,
+                                             mda=mda)
+                    else:
+                        print(f"🟢 Face detected with quality: {face_quality}")
+                else:
+                    print("🔴 Failed to save image")
+            
+            # Create employee with MDA from current user
             emp = Employee(
                 employeeid=empid,
                 name=name,
                 mda=mda,
-                email=email,
+                email=email,  # Store lowercase email
                 phone=phone,
                 role=role,
                 registered_image=img_filename
             )
+            
+            print("🟡 Adding employee to database...")
             db.session.add(emp)
             db.session.commit()
-            flash(f"✅ Employee {empid} registered successfully!", "success")
+            print(f"🟢✅ SUCCESS! Employee {empid} saved to database!")
+            print(f"   Saved with email: '{email}'")
+            
+            flash(f"✅ Employee {empid} registered successfully! (MDA: {mda}, Face quality: {round(face_quality*100)}%)", "success")
             return redirect(url_for('employees'))
             
         except Exception as e:
-            if "UNIQUE constraint failed: employee.employeeid" in str(e):
-                flash("❌ Employee ID already exists. Please try a different name or contact admin.", "danger")
+            error_message = str(e)
+            print(f"🔴❌ REGISTRATION ERROR: {error_message}")
+            import traceback
+            traceback.print_exc()
+            
+            if "UNIQUE constraint failed" in error_message:
+                if "employee.email" in error_message:
+                    flash(f"❌ Email {raw_email} already exists in the database", "danger")
+                elif "employee.phone" in error_message:
+                    flash(f"❌ Phone {phone} already exists in the database", "danger")
+                elif "employee.employeeid" in error_message:
+                    flash("❌ Employee ID already exists. Please try a different name or contact admin.", "danger")
+                else:
+                    flash("❌ A unique constraint failed. Please check your data.", "danger")
             else:
-                flash(f"❌ Registration failed: {str(e)}", "danger")
+                flash(f"❌ Registration failed: {error_message}", "danger")
+            
             db.session.rollback()
-            return render_template('register.html')
+            print("🔴 Database rolled back")
+            
+            # Clean up uploaded image if it exists
+            if 'img_filename' in locals() and img_filename:
+                full_path = os.path.join(app.config['UPLOAD_FOLDER'], img_filename)
+                if os.path.exists(full_path):
+                    os.remove(full_path)
+                    print(f"🔴 Cleaned up image: {img_filename}")
+            
+            return render_template('register.html', 
+                                 name=name, 
+                                 email=raw_email, 
+                                 phone=phone,
+                                 mda=mda)
     
     return render_template('register.html')
 
@@ -283,24 +658,44 @@ def take_attendance():
             return jsonify({"status":"error","msg":"no image"}), 400
         
         img_path = save_base64_image(b64, prefix=f"attendance_{empid}")
+        if not img_path:
+            return jsonify({"status":"error","msg":"Failed to save image"}), 500
+            
+        captured_path = os.path.join(app.config['UPLOAD_FOLDER'], img_path)
+        
+        face_detected, captured_encoding, _, face_quality = detect_and_encode_face(captured_path)
+        
+        if not face_detected:
+            os.remove(captured_path)
+            return jsonify({
+                "status":"error",
+                "msg":"No face detected. Please ensure your face is clearly visible."
+            }), 400
+        
+        liveness_passed = check_liveness(captured_path)
+        
         today = date.today()
         ts = Timesheet.query.filter_by(employee_id=emp.id, date=today).order_by(Timesheet.id.desc()).first()
         now_t = datetime.now().time()
         
-        # NEW CHECK: Reject if complete attendance already taken today
-        if ts and ts.date and ts.time_in and ts.time_out:
-            return jsonify({"status":"error","msg":"You have taken complete attendance today"}), 400
+        if ts and ts.time_in and ts.time_out:
+            os.remove(captured_path)
+            return jsonify({"status":"error","msg":"You have already completed attendance today"}), 400
         
         reg_path = None
+        reg_encoding = None
         if emp.registered_image:
             reg_path = os.path.join(app.config['UPLOAD_FOLDER'], emp.registered_image)
-        
-        captured_path = os.path.join(app.config['UPLOAD_FOLDER'], img_path)
+            if os.path.exists(reg_path):
+                _, reg_encoding, _, _ = detect_and_encode_face(reg_path)
         
         if ts is None or ts.time_in is None:
             signin_match = False
-            if reg_path and os.path.exists(reg_path) and os.path.exists(captured_path):
-                signin_match = not images_mismatch(reg_path, captured_path)
+            confidence = 0.0
+            
+            if reg_encoding is not None and captured_encoding is not None:
+                match, confidence = compare_faces(reg_encoding, captured_encoding)
+                signin_match = bool(match)
             
             new = Timesheet(
                 employee_id=emp.id,
@@ -310,73 +705,120 @@ def take_attendance():
                 signin_image=img_path,
                 date=today,
                 time_in=now_t,
-                reg_signin_match=signin_match,    # REGISTERED == SIGN-IN?
-                reg_signout_match=False           # Default until sign-out
+                reg_signin_match=signin_match,
+                reg_signout_match=False,
+                signin_confidence=float(confidence),
+                signin_face_quality=float(face_quality),
+                signin_liveness_passed=bool(liveness_passed)
             )
             db.session.add(new)
             db.session.commit()
+            
+            match_emoji = "✅" if signin_match else "❌"
             return jsonify({
                 "status":"ok", 
                 "action":"signed_in", 
-                "face_match": signin_match,
-                "message": f"Signed in: {emp.name} ({'✅' if signin_match else '❌'})"
+                "face_match": bool(signin_match),
+                "confidence": float(round(confidence * 100, 2)),
+                "face_quality": float(round(face_quality * 100, 2)),
+                "liveness_passed": bool(liveness_passed),
+                "message": f"Signed in: {emp.name} ({match_emoji}) - {round(confidence*100)}% match"
             })
         
         else:
             signout_match = False
-            if reg_path and os.path.exists(reg_path) and os.path.exists(captured_path):
-                signout_match = not images_mismatch(reg_path, captured_path)
+            confidence = 0.0
+            
+            if reg_encoding is not None and captured_encoding is not None:
+                match, confidence = compare_faces(reg_encoding, captured_encoding)
+                signout_match = bool(match)
             
             ts.signout_image = img_path
             ts.time_out = now_t
-            ts.reg_signout_match = signout_match  # REGISTERED == SIGN-OUT?
+            ts.reg_signout_match = signout_match
+            ts.signout_confidence = float(confidence)
+            ts.signout_face_quality = float(face_quality)
+            ts.signout_liveness_passed = bool(liveness_passed)
             db.session.commit()
             
+            match_emoji = "✅" if signout_match else "❌"
             return jsonify({
                 "status":"ok", 
                 "action":"signed_out", 
-                "face_match": signout_match,
-                "message": f"Signed out: {emp.name} ({'✅' if signout_match else '❌'})"
+                "face_match": bool(signout_match),
+                "confidence": float(round(confidence * 100, 2)),
+                "face_quality": float(round(face_quality * 100, 2)),
+                "liveness_passed": bool(liveness_passed),
+                "message": f"Signed out: {emp.name} ({match_emoji}) - {round(confidence*100)}% match"
             })
     return render_template('take_attendance.html')
 
 
-
 # ------------------------------
-# Employees list, edit, delete
+# Employees list (with role-based permissions)
 # ------------------------------
 @app.route('/employees')
 @login_required
 def employees():
     q = Employee.query
-    # filtering
-    name = request.args.get('name')
-    mda = request.args.get('mda')
-    empid = request.args.get('employeeid')
+    
+    # Get filter parameters
+    name = request.args.get('name', '')
+    mda = request.args.get('mda', '')
+    empid = request.args.get('employeeid', '')
+    email = request.args.get('email', '')
+    
+    # Apply filters if provided
     if name:
         q = q.filter(Employee.name.ilike(f"%{name}%"))
     if mda:
         q = q.filter(Employee.mda.ilike(f"%{mda}%"))
     if empid:
         q = q.filter(Employee.employeeid.ilike(f"%{empid}%"))
-    # role-based scoping: user only see same mda
-    if current_user.role != 'admin' and current_user.mda:
-        q = q.filter(Employee.mda == current_user.mda)
+    if email:
+        q = q.filter(Employee.email.ilike(f"%{email}%"))
+    
+    # Role-based filtering
+    if current_user.is_superadmin():
+        # Superadmin sees all employees
+        pass
+    elif current_user.is_admin():
+        # Admin sees all employees (view-only)
+        pass
+    else:
+        # Regular users only see their MDA
+        if current_user.mda:
+            q = q.filter(Employee.mda == current_user.mda)
+            print(f"🔍 Filtering employees for user MDA: {current_user.mda}")
+        else:
+            print(f"⚠️ User {current_user.email} has no MDA set")
+            q = q.filter(False)
+    
+    # Order by newest first
     items = q.order_by(Employee.created_at.desc()).all()
-    return render_template('employees.html', employees=items)
-
+    
+    # Debug print to console
+    print(f"\n=== EMPLOYEES QUERY ===")
+    print(f"Current user: {current_user.email} (Role: {current_user.role}, MDA: {current_user.mda})")
+    print(f"Found {len(items)} employees:")
+    for emp in items:
+        print(f"  - {emp.employeeid}: {emp.name} (MDA: {emp.mda})")
+    
+    # IMPORTANT: Pass both employees and user_role to template
+    return render_template('employees.html', employees=items, user_role=current_user.role)
 @app.route('/employees/edit/<int:id>', methods=['GET', 'POST'])
 @login_required
 def edit_employee(id):
+    # Only superadmin can edit
+    if not current_user.is_superadmin():
+        flash("👑 Only Super Admin can edit employees!", "danger")
+        return redirect(url_for('employees'))
+    
     try:
         emp = Employee.query.get_or_404(id)
     except Exception as e:
         app.logger.error(f"Error fetching employee {id}: {e}")
         flash("Employee not found or error occurred.", "danger")
-        return redirect(url_for('employees'))
-
-    if current_user.role != 'admin' and current_user.mda and current_user.mda != emp.mda:
-        flash("Not authorized", "warning")
         return redirect(url_for('employees'))
 
     if request.method == 'POST':
@@ -385,24 +827,43 @@ def edit_employee(id):
         emp.email = request.form['email']
         emp.phone = request.form['phone']
         emp.role = request.form.get('role', emp.role)
-        db.session.commit()
-        flash("Employee updated", "success")
-        return redirect(url_for('employees'))
+        
+        try:
+            db.session.commit()
+            flash(f"✅ Employee {emp.name} updated successfully!", "success")
+            return redirect(url_for('employees'))
+        except Exception as e:
+            db.session.rollback()
+            flash(f"❌ Error updating employee: {str(e)}", "danger")
+            return render_template('edit_employee.html', emp=emp)
 
-    return render_template('edit_employee.html', emp=emp)
+    return render_template('edit_employee.html', emp=emp, user_role=current_user.role)
+
 
 @app.route('/employees/delete/<int:id>', methods=['POST'])
 @login_required
 def delete_employee(id):
+    # Only superadmin can delete
+    if not current_user.is_superadmin():
+        return jsonify({"status":"error","msg":"👑 Only Super Admin can delete employees!"}), 403
+    
     emp = Employee.query.get_or_404(id)
-    if current_user.role != 'admin' and current_user.mda and current_user.mda != emp.mda:
-        return jsonify({"status":"error","msg":"not authorized"}), 403
-    db.session.delete(emp)
-    db.session.commit()
-    return jsonify({"status":"ok"})
+    
+    try:
+        db.session.delete(emp)
+        db.session.commit()
+        db.session.expire_all()
+        return jsonify({"status":"ok", "msg":f"Employee {emp.name} deleted successfully"})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"status":"error","msg":str(e)}), 500
+
 
 # ------------------------------
-# Timesheet list, edit, delete
+# Timesheet routes (with role-based permissions)
+# ------------------------------
+# ------------------------------
+# Timesheet list - Shows today's data by default
 # ------------------------------
 @app.route('/timesheet')
 @login_required
@@ -413,18 +874,23 @@ def timesheet():
     empid = request.args.get('employeeid')
     date_from = request.args.get('date_from')
     date_to = request.args.get('date_to')
+    
+    # If no date filters are provided, default to today
+    if not date_from and not date_to:
+        today = date.today()
+        q = q.filter(Timesheet.date == today)
+        print(f"📅 Showing today's records: {today}")
 
     if name:
         q = q.filter(Timesheet.employee_name.ilike(f"%{name}%"))
     if mda:
         q = q.filter(Timesheet.mda.ilike(f"%{mda}%"))
     if empid:
-        # lookup employee id via related employee
         emp = Employee.query.filter_by(employeeid=empid).first()
         if emp:
             q = q.filter(Timesheet.employee_id == emp.id)
         else:
-            q = q.filter(False)  # no results
+            q = q.filter(False)
     if date_from:
         try:
             df = datetime.strptime(date_from, "%Y-%m-%d").date()
@@ -437,21 +903,75 @@ def timesheet():
             q = q.filter(Timesheet.date <= dt)
         except:
             pass
-    # role based scoping
-    if current_user.role != 'admin' and current_user.mda:
+    
+    # Role based scoping
+    if current_user.role != 'admin' and current_user.role != 'superadmin' and current_user.mda:
         q = q.filter(Timesheet.mda == current_user.mda)
+    
     items = q.order_by(Timesheet.date.desc(), Timesheet.time_in.desc()).all()
-    return render_template('timesheet.html', times=items)
+    
+    return render_template('timesheet.html', 
+                         times=items, 
+                         now=datetime,
+                         date=date,
+                         time=time)
+
+
+# ------------------------------
+# Timesheet History - View all records
+# ------------------------------
+@app.route('/timesheet/history')
+@login_required
+def timesheet_history():
+    """View complete timesheet history without date filters"""
+    q = Timesheet.query
+    name = request.args.get('name')
+    mda = request.args.get('mda')
+    empid = request.args.get('employeeid')
+    
+    if name:
+        q = q.filter(Timesheet.employee_name.ilike(f"%{name}%"))
+    if mda:
+        q = q.filter(Timesheet.mda.ilike(f"%{mda}%"))
+    if empid:
+        emp = Employee.query.filter_by(employeeid=empid).first()
+        if emp:
+            q = q.filter(Timesheet.employee_id == emp.id)
+        else:
+            q = q.filter(False)
+    
+    # Role based scoping
+    if current_user.role != 'admin' and current_user.role != 'superadmin' and current_user.mda:
+        q = q.filter(Timesheet.mda == current_user.mda)
+    
+    items = q.order_by(Timesheet.date.desc(), Timesheet.time_in.desc()).all()
+    
+    return render_template('timesheet.html', 
+                         times=items, 
+                         now=datetime,
+                         date=date,
+                         time=time,
+                         history_mode=True)
+
 
 @app.route('/timesheet/delete/<int:id>', methods=['POST'])
 @login_required
 def delete_timesheet(id):
+    # Only superadmin can delete timesheet entries
+    if not current_user.is_superadmin():
+        return jsonify({"status":"error","msg":"👑 Only Super Admin can delete timesheet records!"}), 403
+    
     ts = Timesheet.query.get_or_404(id)
-    if current_user.role != 'admin' and current_user.mda and current_user.mda != ts.mda:
-        return jsonify({"status":"error","msg":"not authorized"}), 403
-    db.session.delete(ts)
-    db.session.commit()
-    return jsonify({"status":"ok"})
+    
+    try:
+        db.session.delete(ts)
+        db.session.commit()
+        db.session.expire_all()
+        return jsonify({"status":"ok"})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"status":"error","msg":str(e)}), 500
+
 
 from flask_wtf import FlaskForm
 from wtforms import StringField, DateField, TimeField, SubmitField
@@ -466,18 +986,23 @@ class EditTimesheetForm(FlaskForm):
     time_out = TimeField('Time Out', format='%H:%M:%S', validators=[Optional()])
     submit = SubmitField('Update')
 
+
 @app.route('/timesheet/edit/<int:id>', methods=['GET','POST'])
 @login_required
-def edit_timesheet(id):
+def edit_timesheet_entry(id):
+    # Only superadmin can edit timesheet entries
+    if not current_user.is_superadmin():
+        flash("👑 Only Super Admin can edit timesheet records!", "danger")
+        return redirect(url_for('timesheet'))
+    
     ts = Timesheet.query.get_or_404(id)
     
-    form = EditTimesheetForm(obj=ts)  # Auto-populates ALL fields including date
+    form = EditTimesheetForm(obj=ts)
     
     if request.method == 'POST' and form.validate_on_submit():
-        # Update from form data
         ts.employee_name = form.employee_name.data or ts.employee_name
         ts.mda = form.mda.data or ts.mda
-        ts.date = form.date.data or ts.date  # NEW: Update date
+        ts.date = form.date.data or ts.date
         
         if form.time_in.data:
             ts.time_in = form.time_in.data
@@ -494,13 +1019,19 @@ def edit_timesheet(id):
 @app.route('/timesheet/mismatch/delete/<int:id>', methods=['POST'])
 @login_required
 def delete_mismatch(id):
+    # Only superadmin can delete mismatch records
+    if not current_user.is_superadmin():
+        return jsonify({"status":"error","msg":"👑 Only Super Admin can delete mismatch records!"}), 403
+    
     ts = Timesheet.query.get_or_404(id)
     try:
         db.session.delete(ts)
         db.session.commit()
+        db.session.expire_all()
         return jsonify({"status": "ok", "msg": "Record deleted"})
     except Exception as e:
         return jsonify({"status": "error", "msg": str(e)}), 500
+
 
 @app.route('/timesheet/mismatch/export/pdf')
 @login_required
@@ -529,7 +1060,6 @@ def export_mismatch_pdf():
     
     mismatches = q.order_by(Timesheet.date.desc(), Timesheet.id.desc()).all()
     
-    # Create PDF
     buffer = io.BytesIO()
     p = canvas.Canvas(buffer, pagesize=letter)
     width, height = letter
@@ -548,23 +1078,23 @@ def export_mismatch_pdf():
             p.showPage()
             y = height - 40
         status = "🚨 MISMATCH" if not (ts.reg_signin_match and ts.reg_signout_match) else "✅ OK"
-        text = f"ID: {ts.id} | {ts.employee_name} | {ts.date} | SignIn: {ts.reg_signin_match} | SignOut: {ts.reg_signout_match} | {status}"
+        confidence_info = f" | SignIn Conf: {round(ts.signin_confidence*100) if ts.signin_confidence else 0}%"
+        text = f"ID: {ts.id} | {ts.employee_name} | {ts.date} | {status}{confidence_info}"
         p.drawString(30, y, text)
         y -= 20
     
     p.save()
     buffer.seek(0)
     
-    response = make_response(buffer.getvalue())  # ✅ FIXED: buffer.getvalue()
+    response = make_response(buffer.getvalue())
     response.headers['Content-Type'] = 'application/pdf'
     response.headers['Content-Disposition'] = 'attachment; filename=mismatch_report.pdf'
     return response
 
+
 # ------------------------------
 # Image mismatch detection
 # ------------------------------
-from sqlalchemy import or_
-
 @app.route('/timesheet/mismatch')
 @login_required
 def mismatch():
@@ -573,19 +1103,16 @@ def mismatch():
     
     q = db.session.query(Timesheet).outerjoin(Employee)
     
-    # Apply name filter if provided (case-insensitive partial match)
     if name:
         q = q.filter(Timesheet.employee_name.ilike(f"%{name}%"))
     
-    # Apply date filter if provided
     if date_filter:
         try:
             dt = datetime.strptime(date_filter, "%Y-%m-%d").date()
             q = q.filter(Timesheet.date == dt)
         except Exception:
-            pass  # Ignore invalid date formats
+            pass
     
-    # Filter for records where either sign-in or sign-out comparison failed
     q = q.filter(
         or_(
             Timesheet.reg_signin_match == False,
@@ -607,13 +1134,17 @@ def mismatch():
             'time_out': ts.time_out.strftime('%H:%M') if ts.time_out else 'N/A',
             'reg_signin_match': ts.reg_signin_match,
             'reg_signout_match': ts.reg_signout_match,
-            'has_mismatch': not (ts.reg_signin_match and ts.reg_signout_match)
+            'has_mismatch': not (ts.reg_signin_match and ts.reg_signout_match),
+            'signin_confidence': ts.signin_confidence,
+            'signout_confidence': ts.signout_confidence,
+            'signin_face_quality': ts.signin_face_quality,
+            'signout_face_quality': ts.signout_face_quality,
+            'signin_liveness_passed': ts.signin_liveness_passed,
+            'signout_liveness_passed': ts.signout_liveness_passed
         }
         mismatch_data.append(data)
     
-    return render_template('mismatch.html', mismatches=mismatch_data)
-
-
+    return render_template('mismatch.html', mismatches=mismatch_data, user_role=current_user.role)
 
 
 # ------------------------------
@@ -623,7 +1154,7 @@ def mismatch():
 @login_required
 def export_excel():
     q = Timesheet.query
-    if current_user.role != 'admin' and current_user.mda:
+    if not current_user.is_admin() and current_user.mda:
         q = q.filter(Timesheet.mda == current_user.mda)
     items = q.all()
     rows = []
@@ -633,7 +1164,10 @@ def export_excel():
             "mda": t.mda,
             "date": t.date.isoformat(),
             "time_in": t.time_in.isoformat() if t.time_in else "",
-            "time_out": t.time_out.isoformat() if t.time_out else ""
+            "time_out": t.time_out.isoformat() if t.time_out else "",
+            "signin_confidence": round(t.signin_confidence*100, 2) if t.signin_confidence else "",
+            "signout_confidence": round(t.signout_confidence*100, 2) if t.signout_confidence else "",
+            "face_match_status": "✅ Match" if t.reg_signin_match and t.reg_signout_match else "❌ Mismatch"
         })
     df = pd.DataFrame(rows)
     buf = io.BytesIO()
@@ -642,23 +1176,32 @@ def export_excel():
     buf.seek(0)
     return send_file(buf, as_attachment=True, download_name='timesheet.xlsx', mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
 
+
+# ------------------------------
+# Office route
+# ------------------------------
 @app.route('/office')
 @login_required
 def office():
-    print("🔥 OFFICE ROUTE HIT!")  # Terminal debug
+    print("🔥 OFFICE ROUTE HIT!")
     
     today = date.today()
     office_employees = []
     
     try:
-        # Safe query with error handling - employees CURRENTLY IN OFFICE
-        employees_query = db.session.query(Timesheet, Employee).outerjoin(
+        query = db.session.query(Timesheet, Employee).outerjoin(
             Employee, Timesheet.employee_id == Employee.id
         ).filter(
             Timesheet.date == today,
             Timesheet.time_in.isnot(None),
-            Timesheet.time_out.is_(None)  # ✅ No sign-out yet
-        ).order_by(Timesheet.time_in.desc()).all()
+            Timesheet.time_out.is_(None)
+        )
+        
+        if not current_user.is_admin() and current_user.mda:
+            query = query.filter(Timesheet.mda == current_user.mda)
+            print(f"🔍 Filtering office for user MDA: {current_user.mda}")
+        
+        employees_query = query.order_by(Timesheet.time_in.desc()).all()
         
         for ts, emp in employees_query:
             office_employees.append({
@@ -667,17 +1210,14 @@ def office():
                 'mda': ts.mda or (emp.mda if emp else 'N/A'),
                 'time_in': ts.time_in,
                 'signin_image': ts.signin_image,
-                'reg_signin_match': ts.reg_signin_match,      # ✅ NEW: Sign-in match status
+                'reg_signin_match': ts.reg_signin_match,
+                'signin_confidence': ts.signin_confidence,
                 'Employee': emp
             })
-        
-        # Role-based filtering (user sees only their MDA)
-        if current_user.role != 'admin' and current_user.mda:
-            office_employees = [e for e in office_employees if e['mda'] == current_user.mda]
             
     except Exception as e:
         print(f"❌ OFFICE QUERY ERROR: {e}")
-        office_employees = []  # Empty list on error
+        office_employees = []
     
     print(f"DEBUG: Found {len(office_employees)} employees in office today")
     return render_template('office.html', employees=office_employees, today=today)
@@ -686,20 +1226,27 @@ def office():
 @app.route('/office/delete/<int:timesheet_id>', methods=['POST'])
 @login_required
 def delete_office_record(timesheet_id):
+    # Only superadmin can delete office records
+    if not current_user.is_superadmin():
+        return jsonify({"status": "error", "msg": "👑 Only Super Admin can delete office records!"}), 403
+    
     ts = Timesheet.query.get_or_404(timesheet_id)
-    if current_user.role != 'admin' and current_user.mda and current_user.mda != ts.mda:
-        return jsonify({"status": "error", "msg": "not authorized"}), 403
-    db.session.delete(ts)
-    db.session.commit()
-    return jsonify({"status": "ok"})
-
+    
+    try:
+        db.session.delete(ts)
+        db.session.commit()
+        db.session.expire_all()
+        return jsonify({"status": "ok"})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"status": "error", "msg": str(e)}), 500
 
 
 @app.route('/timesheet/export/pdf')
 @login_required
 def export_pdf():
     q = Timesheet.query
-    if current_user.role != 'admin' and current_user.mda:
+    if not current_user.is_admin() and current_user.mda:
         q = q.filter(Timesheet.mda == current_user.mda)
     items = q.all()
     buf = io.BytesIO()
@@ -711,7 +1258,8 @@ def export_pdf():
     y -= 30
     c.setFont("Helvetica", 10)
     for t in items:
-        line = f"{t.date} | {t.employee_name} | {t.mda} | in: {t.time_in or ''} | out: {t.time_out or ''}"
+        confidence = f" (Match: {round(t.signin_confidence*100)}%)" if t.signin_confidence else ""
+        line = f"{t.date} | {t.employee_name} | {t.mda} | in: {t.time_in or ''} | out: {t.time_out or ''}{confidence}"
         c.drawString(40, y, line)
         y -= 14
         if y < 40:
@@ -721,81 +1269,348 @@ def export_pdf():
     buf.seek(0)
     return send_file(buf, as_attachment=True, download_name='timesheet.pdf', mimetype='application/pdf')
 
+
 # ------------------------------
 # Dashboard
 # ------------------------------
 @app.route('/dashboard')
 @login_required
 def dashboard():
-    # compute per-employee stats
+    db.session.expire_all()
+    
+    employees_query = Employee.query
+    
+    if not current_user.is_admin() and current_user.mda:
+        employees_query = employees_query.filter(Employee.mda == current_user.mda)
+        print(f"🔍 Filtering dashboard employees for user MDA: {current_user.mda}")
+    
+    existing_employees = {}
+    for emp in employees_query.all():
+        existing_employees[emp.name] = emp.mda
+    
+    print(f"\n=== DASHBOARD DEBUG ===")
+    print(f"Existing employees in database: {list(existing_employees.keys())}")
+    
     q = Timesheet.query
-    if current_user.role != 'admin' and current_user.mda:
+    
+    if not current_user.is_admin() and current_user.mda:
         q = q.filter(Timesheet.mda == current_user.mda)
-    items = q.all()
+        print(f"🔍 Filtering dashboard timesheets for user MDA: {current_user.mda}")
+    
+    all_timesheets = q.all()
+    print(f"Total timesheet records: {len(all_timesheets)}")
+    
+    items = [t for t in all_timesheets if t.employee_name in existing_employees]
+    print(f"Timesheet records for existing employees: {len(items)}")
+    
     stats = {}
-    # benchmark times
     bench_in = time(8,30,0)
-    bench_out = time(15,30,0)
+    bench_out = time(16,30,0)
+    
     for t in items:
         name = t.employee_name
         if name not in stats:
             stats[name] = {
-                "mda": t.mda,
+                "mda": existing_employees.get(name, t.mda),
+                "total_days": 0,
                 "signed_in_count": 0,
                 "signed_out_count": 0,
                 "signed_in_no_signout": 0,
-                "late_count": 0,
                 "early_count": 0,
-                "left_before_time": 0,
-                "waited_till_closing": 0,
+                "late_count": 0,
+                "ontime_count": 0,
+                "left_early_count": 0,
+                "stayed_till_close_count": 0,
+                "exact_timeout_count": 0,
+                "avg_confidence": 0,
+                "total_confidence": 0,
+                "high_confidence_count": 0,
+                "medium_confidence_count": 0,
+                "low_confidence_count": 0,
+                "avg_face_quality": 0,
+                "total_face_quality": 0,
+                "liveness_passed_count": 0,
+                "liveness_failed_count": 0,
                 "records": []
             }
         s = stats[name]
         s["records"].append(t)
+        s["total_days"] += 1
+        
         if t.time_in:
             s["signed_in_count"] += 1
-            if t.time_in > bench_in:
+            if t.time_in < bench_in:
+                s["early_count"] += 1
+            elif t.time_in > bench_in:
                 s["late_count"] += 1
             else:
-                s["early_count"] += 1
+                s["ontime_count"] += 1
+            
+            if t.signin_confidence:
+                s["total_confidence"] += t.signin_confidence
+                if t.signin_confidence > 0.8:
+                    s["high_confidence_count"] += 1
+                elif t.signin_confidence > 0.5:
+                    s["medium_confidence_count"] += 1
+                else:
+                    s["low_confidence_count"] += 1
+            
+            if t.signin_face_quality:
+                s["total_face_quality"] += t.signin_face_quality
+            
+            if t.signin_liveness_passed:
+                s["liveness_passed_count"] += 1
+            else:
+                s["liveness_failed_count"] += 1
+        
         if t.time_out:
             s["signed_out_count"] += 1
             if t.time_out < bench_out:
-                s["left_before_time"] += 1
-            if t.time_out >= bench_out:
-                s["waited_till_closing"] += 1
+                s["left_early_count"] += 1
+            elif t.time_out > bench_out:
+                s["stayed_till_close_count"] += 1
+            else:
+                s["exact_timeout_count"] += 1
+            
+            if t.signout_confidence:
+                s["total_confidence"] += t.signout_confidence
+                if t.signout_confidence > 0.8:
+                    s["high_confidence_count"] += 1
+                elif t.signout_confidence > 0.5:
+                    s["medium_confidence_count"] += 1
+                else:
+                    s["low_confidence_count"] += 1
+            
+            if t.signout_face_quality:
+                s["total_face_quality"] += t.signout_face_quality
+            
+            if t.signout_liveness_passed:
+                s["liveness_passed_count"] += 1
+            else:
+                s["liveness_failed_count"] += 1
+        
         if t.time_in and not t.time_out:
             s["signed_in_no_signout"] += 1
 
-    # Convert to list for template
     stats_list = []
     for name, v in stats.items():
+        total_conf_entries = v["signed_in_count"] + v["signed_out_count"]
+        avg_confidence = (v["total_confidence"] / total_conf_entries) if total_conf_entries > 0 else 0
+        
+        total_quality_entries = v["signed_in_count"] + v["signed_out_count"]
+        avg_face_quality = (v["total_face_quality"] / total_quality_entries) if total_quality_entries > 0 else 0
+        
+        attendance_rate = (v["signed_in_count"] / v["total_days"] * 100) if v["total_days"] > 0 else 0
+        punctuality_rate = ((v["early_count"] + v["ontime_count"]) / v["signed_in_count"] * 100) if v["signed_in_count"] > 0 else 0
+        stay_rate = (v["stayed_till_close_count"] / v["signed_out_count"] * 100) if v["signed_out_count"] > 0 else 0
+        
         stats_list.append({
             "employee_name": name,
             "mda": v["mda"],
+            "total_days": v["total_days"],
             "signed_in_count": v["signed_in_count"],
             "signed_out_count": v["signed_out_count"],
             "signed_in_no_signout": v["signed_in_no_signout"],
-            "late_count": v["late_count"],
             "early_count": v["early_count"],
-            "left_before_time": v["left_before_time"],
-            "waited_till_closing": v["waited_till_closing"],
+            "late_count": v["late_count"],
+            "ontime_count": v["ontime_count"],
+            "punctuality_rate": round(punctuality_rate, 1),
+            "left_early_count": v["left_early_count"],
+            "stayed_till_close_count": v["stayed_till_close_count"],
+            "exact_timeout_count": v["exact_timeout_count"],
+            "stay_rate": round(stay_rate, 1),
+            "attendance_rate": round(attendance_rate, 1),
+            "avg_confidence": round(avg_confidence * 100, 2),
+            "high_confidence_count": v["high_confidence_count"],
+            "medium_confidence_count": v["medium_confidence_count"],
+            "low_confidence_count": v["low_confidence_count"],
+            "avg_face_quality": round(avg_face_quality * 100, 2),
+            "liveness_passed_count": v["liveness_passed_count"],
+            "liveness_failed_count": v["liveness_failed_count"],
+            "liveness_rate": round((v["liveness_passed_count"] / (v["liveness_passed_count"] + v["liveness_failed_count"]) * 100), 1) if (v["liveness_passed_count"] + v["liveness_failed_count"]) > 0 else 0,
             "trace_link": url_for('employee_trace', name=name)
         })
-    return render_template('dashboard.html', stats=stats_list)
+    
+    stats_list.sort(key=lambda x: x["total_days"], reverse=True)
+    
+    print(f"Dashboard stats: {len(stats_list)} employees with data")
+    print(f"Employees shown: {[s['employee_name'] for s in stats_list]}")
+    
+    return render_template('dashboard.html', stats=stats_list, user_role=current_user.role)
+
+
+# ------------------------------
+# Admin User Management (Superadmin only)
+# ------------------------------
+@app.route('/admin/users')
+@login_required
+def admin_users():
+    """List all users (Superadmin only)"""
+    if not current_user.is_superadmin():
+        flash("👑 Super Admin access required!", "danger")
+        return redirect(url_for('dashboard'))
+    
+    page = request.args.get('page', 1, type=int)
+    search = request.args.get('search', '')
+    
+    query = User.query
+    
+    if search:
+        query = query.filter(
+            db.or_(
+                User.name.ilike(f'%{search}%'),
+                User.email.ilike(f'%{search}%'),
+                User.mda.ilike(f'%{search}%')
+            )
+        )
+    
+    users = query.order_by(User.role, User.name).paginate(page=page, per_page=20, error_out=False)
+    
+    return render_template('admin_users.html', users=users, search=search, user_role=current_user.role)
+
+
+@app.route('/admin/users/add', methods=['GET', 'POST'])
+@login_required
+def admin_add_user():
+    """Add new user (Superadmin only)"""
+    if not current_user.is_superadmin():
+        flash("👑 Super Admin access required!", "danger")
+        return redirect(url_for('dashboard'))
+    
+    if request.method == 'POST':
+        name = request.form.get('name', '').strip()
+        email = request.form.get('email', '').strip()
+        phone = request.form.get('phone', '').strip()
+        mda = request.form.get('mda', '').strip()
+        role = request.form.get('role', 'user')
+        password = request.form.get('password', '').strip()
+        
+        if not all([name, email, phone, mda, password]):
+            flash("All fields are required", "danger")
+            return redirect(url_for('admin_add_user'))
+        
+        if User.query.filter_by(email=email).first():
+            flash(f"Email {email} is already registered", "danger")
+            return redirect(url_for('admin_add_user'))
+        
+        try:
+            user = User(
+                name=name,
+                email=email,
+                mda=mda,
+                role=role,
+                password_hash=generate_password_hash(password)
+            )
+            db.session.add(user)
+            db.session.commit()
+            
+            flash(f"✅ User {name} created successfully!", "success")
+            return redirect(url_for('admin_users'))
+            
+        except Exception as e:
+            db.session.rollback()
+            flash(f"❌ Error creating user: {str(e)}", "danger")
+            return redirect(url_for('admin_add_user'))
+    
+    return render_template('admin_add_user.html')
+
+
+@app.route('/admin/users/edit/<int:id>', methods=['GET', 'POST'])
+@login_required
+def admin_edit_user(id):
+    """Edit user (Superadmin only)"""
+    if not current_user.is_superadmin():
+        flash("👑 Super Admin access required!", "danger")
+        return redirect(url_for('dashboard'))
+    
+    user = User.query.get_or_404(id)
+    
+    if request.method == 'POST':
+        name = request.form.get('name', '').strip()
+        email = request.form.get('email', '').strip()
+        phone = request.form.get('phone', '').strip()
+        mda = request.form.get('mda', '').strip()
+        role = request.form.get('role', 'user')
+        new_password = request.form.get('password', '').strip()
+        
+        if not all([name, email, phone, mda]):
+            flash("Name, Email, Phone, and MDA are required", "danger")
+            return redirect(url_for('admin_edit_user', id=id))
+        
+        existing = User.query.filter(User.email == email, User.id != id).first()
+        if existing:
+            flash(f"Email {email} is already registered to another user", "danger")
+            return redirect(url_for('admin_edit_user', id=id))
+        
+        try:
+            user.name = name
+            user.email = email
+            user.phone = phone
+            user.mda = mda
+            user.role = role
+            
+            if new_password:
+                user.password_hash = generate_password_hash(new_password)
+            
+            db.session.commit()
+            flash(f"✅ User {name} updated successfully!", "success")
+            return redirect(url_for('admin_users'))
+            
+        except Exception as e:
+            db.session.rollback()
+            flash(f"❌ Error updating user: {str(e)}", "danger")
+            return redirect(url_for('admin_edit_user', id=id))
+    
+    return render_template('admin_edit_user.html', user=user)
+
+
+@app.route('/admin/users/delete/<int:id>', methods=['POST'])
+@login_required
+def admin_delete_user(id):
+    """Delete user (Superadmin only)"""
+    if not current_user.is_superadmin():
+        return jsonify({"status": "error", "msg": "👑 Super Admin access required!"}), 403
+    
+    user = User.query.get_or_404(id)
+    
+    if user.id == current_user.id:
+        return jsonify({"status": "error", "msg": "Cannot delete your own account"}), 400
+    
+    try:
+        username = user.name
+        db.session.delete(user)
+        db.session.commit()
+        return jsonify({"status": "ok", "msg": f"User {username} deleted successfully"})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"status": "error", "msg": str(e)}), 500
+
 
 @app.route('/trace/<name>')
 @login_required
 def employee_trace(name):
-    # show full records for an employee
+    employee = Employee.query.filter_by(name=name).first()
+    
+    if not employee:
+        flash(f"Employee '{name}' not found in database", "warning")
+        return redirect(url_for('dashboard'))
+    
+    if not current_user.is_admin() and current_user.mda and current_user.mda != employee.mda:
+        flash(f"Access denied: Employee {name} is not in your MDA ({current_user.mda})", "danger")
+        return redirect(url_for('dashboard'))
+    
     q = Timesheet.query.filter(Timesheet.employee_name == name)
-    if current_user.role != 'admin' and current_user.mda:
+    
+    if not current_user.is_admin() and current_user.mda:
         q = q.filter(Timesheet.mda == current_user.mda)
+    
     items = q.order_by(Timesheet.date.desc()).all()
-    return render_template('trace.html', records=items, name=name)
+    
+    return render_template('trace.html', records=items, name=name, user_role=current_user.role)
+
 
 # ------------------------------
-# Simple user signup for 'user' role (not admin)
+# Signup
 # ------------------------------
 @app.route('/signup', methods=['GET','POST'])
 def signup():
@@ -804,14 +1619,26 @@ def signup():
         pwd = request.form['password']
         name = request.form.get('name','')
         mda = request.form.get('mda','')
+        
         if User.query.filter_by(email=email).first():
-            flash("Email exists", "warning")
+            flash("Email already exists", "warning")
             return redirect(url_for('signup'))
-        u = User(email=email, password_hash=generate_password_hash(pwd), role='user', name=name, mda=mda)
-        db.session.add(u); db.session.commit()
-        flash("User created, please login", "success")
+        
+        u = User(
+            email=email, 
+            password_hash=generate_password_hash(pwd), 
+            role='user', 
+            name=name, 
+            mda=mda
+        )
+        db.session.add(u)
+        db.session.commit()
+        
+        flash("User created successfully! Please login.", "success")
         return redirect(url_for('login'))
+    
     return render_template('signup.html')
+
 
 # ------------------------------
 # Serve uploaded images
@@ -824,14 +1651,52 @@ def uploads(filename):
 # ------------------------------
 # Run
 # ------------------------------
+# ------------------------------
+# Run
+# ------------------------------
+# ------------------------------
+# Run
+# ------------------------------
 if __name__ == '__main__':
     with app.app_context():
         db.create_all()
-        # ensure admin exists
+        migrate_database()
+        
+        # Create superadmin if not exists
+        superadmin = User.query.filter_by(email='sadmin@gmail.com').first()
+        if not superadmin:
+            superadmin = User(
+                name='sadmin',
+                email='sadmin@gmail.com',
+                password_hash=generate_password_hash('sadmin123'),
+                role='superadmin',
+                mda='SYSTEM'
+            )
+            db.session.add(superadmin)
+            db.session.commit()
+            print("✅ Super Admin created.")
+            print("   👑 Name: sadmin")
+            print("   📧 Email: sadmin@gmail.com")
+            print("   🔑 Password: sadmin123")
+        
+        # Create admin if not exists
         admin = User.query.filter_by(email='admin@gmail.com').first()
         if not admin:
-            admin = User(email='admin@gmail.com', password_hash=generate_password_hash('admin123'), role='admin', name='Administrator')
+            admin = User(
+                name='Administrator',
+                email='admin@gmail.com',
+                password_hash=generate_password_hash('admin123'),
+                role='admin',
+                mda='ADMIN'
+            )
             db.session.add(admin)
             db.session.commit()
-            print("Admin created. Email: admin@gmail.com Password: admin123")
+            print("✅ Admin created. Email: admin@gmail.com Password: admin123")
+        
+        print("\n🔑 User Roles:")
+        print("   👤 User - Can take attendance, register employees, view office")
+        print("   🛡️ Admin - Can view everything (no edit/delete)")
+        print("   👑 Super Admin - Full access (can edit/delete everything)")
+        print("\n🌐 Server starting at http://localhost:5000")
+        
     app.run(debug=True, host='0.0.0.0', port=5000)

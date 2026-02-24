@@ -3,7 +3,7 @@
 <head>
     <title>Register Employee</title>
     <style>
-        * { box-sizing: border-box; }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
         body { 
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
@@ -69,19 +69,67 @@
             color: white;
         }
         .btn-success:hover { background: #218838; transform: translateY(-2px); }
+        .btn-secondary {
+            background: #6c757d;
+            color: white;
+        }
+        .btn-secondary:hover { background: #5a6268; transform: translateY(-2px); }
+        .btn-camera {
+            background: linear-gradient(135deg, #ff4b1f 0%, #ff9068 100%);
+            color: white;
+            font-size: 18px;
+            padding: 15px;
+            margin-top: 10px;
+        }
+        .btn-camera:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(255, 75, 31, 0.3);
+        }
+        .btn-camera:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            opacity: 0.6;
+            transform: none;
+        }
+        .btn-capture {
+            background: #ffc107;
+            color: #000;
+            font-size: 18px;
+            padding: 15px;
+            margin-top: 10px;
+            font-weight: bold;
+            animation: pulse 2s infinite;
+        }
+        .btn-capture:hover:not(:disabled) {
+            background: #e0a800;
+            transform: scale(1.02);
+        }
+        .btn-capture:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            opacity: 0.6;
+            animation: none;
+        }
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.02); }
+            100% { transform: scale(1); }
+        }
         .btn:disabled {
             background: #ccc;
             cursor: not-allowed;
             transform: none;
+            opacity: 0.5;
         }
         .camera-section {
             display: none;
             margin: 20px 0;
+            position: relative;
         }
         .camera-container {
             position: relative;
             width: 100%;
-            height: 280px;
+            height: 300px;
             background: #000;
             border-radius: 15px;
             overflow: hidden;
@@ -92,26 +140,39 @@
             height: 100%;
             object-fit: cover;
         }
-        #registerFaceOverlay {
+        /* Egg-shaped face guide with completely grey background */
+        .face-guide {
             position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 132px;
+            height: 168px;
+            border: 3px solid rgba(255, 255, 255, 0.9);
+            border-radius: 50% 50% 45% 45% / 55% 55% 45% 45%;
+            box-shadow: 0 0 0 2000px rgba(128, 128, 128, 0.95);
             pointer-events: none;
+            transition: border-color 0.3s ease;
+            z-index: 10;
         }
-        #registerSnapshot {
-            max-width: 100%;
-            border-radius: 10px;
-            display: none;
-            margin-top: 10px;
+        .face-guide.face-detected {
+            border-color: #28a745;
+            box-shadow: 0 0 0 2000px rgba(128, 128, 128, 0.95), 0 0 20px #28a745;
         }
-        #registerCountdown {
-            font-size: 2.5em;
-            font-weight: bold;
-            color: #28a745;
-            margin: 10px 0;
-            display: none;
+        .face-guide-label {
+            position: absolute;
+            bottom: -30px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: white;
+            font-size: 12px;
+            white-space: nowrap;
+            text-shadow: 1px 1px 2px black;
+            background: rgba(0,0,0,0.7);
+            padding: 4px 12px;
+            border-radius: 20px;
+            pointer-events: none;
+            z-index: 11;
         }
         #registerStatus {
             text-align: center;
@@ -123,212 +184,859 @@
         .status-ready { background: #d4edda; color: #155724; }
         .status-active { background: #fff3cd; color: #856404; }
         .status-face { background: #d1ecf1; color: #0c5460; }
+        .status-error { background: #f8d7da; color: #721c24; }
+        .status-success { background: #d4edda; color: #155724; font-size: 18px; }
+        
+        .quality-bar {
+            width: 100%;
+            height: 10px;
+            background: #e9ecef;
+            border-radius: 5px;
+            margin: 10px 0;
+            overflow: hidden;
+        }
+        .quality-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #28a745, #20c997);
+            transition: width 0.3s ease;
+            border-radius: 5px;
+        }
+        .quality-text {
+            font-size: 14px;
+            color: #6c757d;
+            margin-top: 5px;
+            text-align: center;
+        }
+        /* Flash message styles */
+        .flash-messages {
+            margin-bottom: 20px;
+        }
+        .alert {
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 10px;
+            font-weight: 500;
+            animation: slideIn 0.3s ease-out;
+        }
+        .alert-danger {
+            background-color: #f8d7da;
+            border: 2px solid #dc3545;
+            color: #721c24;
+        }
+        .alert-success {
+            background-color: #d4edda;
+            border: 2px solid #28a745;
+            color: #155724;
+        }
+        .alert-warning {
+            background-color: #fff3cd;
+            border: 2px solid #ffc107;
+            color: #856404;
+        }
+        .alert-info {
+            background-color: #d1ecf1;
+            border: 2px solid #17a2b8;
+            color: #0c5460;
+        }
+        .btn-close {
+            float: right;
+            font-size: 1.5rem;
+            font-weight: 700;
+            line-height: 1;
+            color: #000;
+            text-shadow: 0 1px 0 #fff;
+            opacity: .5;
+            background: transparent;
+            border: 0;
+            cursor: pointer;
+        }
+        .btn-close:hover {
+            opacity: .75;
+        }
+        .error-message {
+            color: #dc3545;
+            background: #f8d7da;
+            padding: 15px;
+            border-radius: 10px;
+            margin: 20px 0;
+            display: none;
+            text-align: center;
+            font-size: 16px;
+            border: 2px solid #dc3545;
+        }
+        .success-message {
+            color: #155724;
+            background: #d4edda;
+            padding: 15px;
+            border-radius: 10px;
+            margin: 20px 0;
+            display: none;
+            text-align: center;
+            font-size: 18px;
+            border: 2px solid #28a745;
+            animation: slideIn 0.5s ease-out;
+        }
+        .employee-id-container {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 25px;
+            border-radius: 15px;
+            margin: 20px 0;
+            text-align: center;
+            box-shadow: 0 10px 30px rgba(102, 126, 234, 0.3);
+            animation: slideIn 0.5s ease-out;
+        }
+        @keyframes slideIn {
+            from {
+                transform: translateY(-20px);
+                opacity: 0;
+            }
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+        .employee-id-label {
+            font-size: 14px;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            opacity: 0.9;
+            margin-bottom: 10px;
+        }
+        .employee-id-value {
+            font-size: 48px;
+            font-weight: bold;
+            letter-spacing: 4px;
+            margin: 10px 0;
+            font-family: 'Courier New', monospace;
+            background: rgba(255, 255, 255, 0.2);
+            padding: 10px 20px;
+            border-radius: 10px;
+            display: inline-block;
+        }
+        .copy-btn {
+            background: white;
+            color: #667eea;
+            border: none;
+            padding: 12px 25px;
+            border-radius: 50px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            margin: 15px 0 5px 0;
+            transition: all 0.3s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .copy-btn:hover {
+            transform: scale(1.05);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+        }
+        .copy-btn.copied {
+            background: #28a745;
+            color: white;
+        }
+        .copy-feedback {
+            font-size: 14px;
+            margin-top: 10px;
+            min-height: 20px;
+            color: #ffd700;
+        }
+        .employee-details {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 15px;
+            border-radius: 10px;
+            margin: 15px 0;
+            text-align: left;
+        }
+        .employee-details div {
+            margin: 8px 0;
+            font-size: 16px;
+        }
+        .employee-details strong {
+            display: inline-block;
+            width: 80px;
+            opacity: 0.9;
+        }
+        .done-btn {
+            background: #28a745;
+            color: white;
+            font-size: 20px;
+            padding: 15px 30px;
+            border-radius: 50px;
+            border: none;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            width: 100%;
+            margin-top: 20px;
+            animation: pulse-green 2s infinite;
+        }
+        .done-btn:hover {
+            background: #218838;
+            transform: scale(1.02);
+        }
+        .form-fields {
+            transition: all 0.3s ease;
+        }
+        .form-fields.hidden {
+            display: none;
+        }
+        /* Highlight duplicate fields */
+        .input-duplicate {
+            border-color: #dc3545 !important;
+            background-color: #fff8f8;
+        }
+        .flash-message {
+            animation: flash 0.2s ease-out;
+        }
+        @keyframes flash {
+            0% { opacity: 1; }
+            50% { opacity: 0.3; }
+            100% { opacity: 1; }
+        }
+        /* Disable video feed after capture */
+        .camera-section.disabled {
+            opacity: 0.5;
+            pointer-events: none;
+        }
+        /* User info card */
+        .user-info {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            text-align: center;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        .user-info i {
+            margin-right: 8px;
+            font-size: 1.2rem;
+        }
+        .user-info strong {
+            background: rgba(255,255,255,0.2);
+            padding: 4px 12px;
+            border-radius: 20px;
+            margin-left: 8px;
+        }
+        .validation-status {
+            background: #e9ecef;
+            padding: 10px;
+            border-radius: 5px;
+            margin: 15px 0;
+            text-align: center;
+            font-size: 14px;
+            border: 2px dashed #667eea;
+        }
+        .validation-status.complete {
+            background-color: #d4edda;
+            border-color: #28a745;
+            color: #155724;
+        }
+        .button-group {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+        }
+        .button-group .btn {
+            flex: 1;
+        }
+        .cropped-preview {
+            display: none;
+            max-width: 100%;
+            border-radius: 10px;
+            margin-top: 10px;
+            border: 3px solid #28a745;
+        }
     </style>
 </head>
 <body>
     <div class="container">
         <h2>👤 Register Employee</h2>
         
-        <form method="POST" enctype="multipart/form-data" id="registerForm">
-            <input type="hidden" name="employeeid" value="EMP2025">
-            <input type="hidden" name="status" value="ok">
-            <input type="hidden" name="face_image" id="face_image" required>
-
-            <label for="name">Name</label>
-            <input type="text" id="name" name="name" required>
-
-            <label for="mda">MDA</label>
-            <input type="text" id="mda" name="mda" required>
-
-            <label for="email">Email</label>
-            <input type="email" id="email" name="email" required>
-
-            <label for="phone">Phone</label>
-            <input type="text" id="phone" name="phone" required>
-
-            <label for="role">Role</label>
-            <select id="role" name="role" required>
-                <option value="user" selected>User (Default)</option>
-                <option value="admin">Admin</option>
-            </select>
-
-            <!-- AUTO-CAPTURE CAMERA SECTION (EXACT SAME LOGIC) -->
-            <div id="registerCameraSection" class="camera-section">
-                <label class="form-label">📸 Face Detection (Auto-capture in 3s)</label>
-                <div class="camera-container">
-                    <video id="registerVideo" autoplay muted></video>
-                    <canvas id="registerFaceOverlay"></canvas>
+        <!-- Flash Messages from Server -->
+        <div class="flash-messages">
+            {% with messages = get_flashed_messages(with_categories=true) %}
+                {% if messages %}
+                    {% for category, message in messages %}
+                        <div class="alert alert-{{ category if category != 'message' else 'info' }} alert-dismissible fade show" role="alert">
+                            <i class="fas {% if category == 'danger' %}fa-exclamation-circle{% elif category == 'success' %}fa-check-circle{% elif category == 'warning' %}fa-exclamation-triangle{% else %}fa-info-circle{% endif %} me-2"></i>
+                            {{ message }}
+                            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                        </div>
+                    {% endfor %}
+                {% endif %}
+            {% endwith %}
+        </div>
+        
+        <!-- User Info Card - Shows current user's MDA -->
+        <div class="user-info">
+            <i class="fas fa-user"></i> Logged in as: <strong>{{ current_user.name or current_user.email }}</strong>
+            <br>
+            <i class="fas fa-building"></i> Registering for MDA: <strong>{{ current_user.mda or 'Not Set' }}</strong>
+            <br>
+            <small>(MDA auto-set from your account)</small>
+        </div>
+        
+        <div id="errorMessage" class="error-message"></div>
+        <div id="successMessage" class="success-message"></div>
+        
+        <div id="registrationComplete" style="display: none;">
+            <div class="employee-id-container">
+                <div class="employee-id-label">EMPLOYEE ID GENERATED</div>
+                <div class="employee-id-value" id="displayEmployeeId"></div>
+                
+                <button class="copy-btn" id="copyIdBtn" onclick="copyEmployeeId()">
+                    <span>📋</span> Copy Employee ID
+                </button>
+                <div class="copy-feedback" id="copyFeedback"></div>
+                
+                <div class="employee-details" id="employeeDetails"></div>
+                
+                <div style="font-size: 14px; margin: 10px 0; opacity: 0.9;">
+                    Save this ID for attendance taking
                 </div>
-                <canvas id="registerCanvas" style="display:none;"></canvas>
-                <div id="registerCountdown">3</div>
-                <img id="registerSnapshot" alt="Captured Face">
             </div>
+            
+            <button class="done-btn" onclick="goToDashboard()">
+                ✅ DONE - Go to Dashboard
+            </button>
+            
+            <button class="btn btn-secondary" onclick="goToEmployees()" style="margin-top: 10px;">
+                👥 View All Employees
+            </button>
+        </div>
+        
+        <form method="POST" enctype="multipart/form-data" id="registerForm">
+            <div class="form-fields" id="formFields">
+                <input type="hidden" name="employeeid" value="EMP2025">
+                <input type="hidden" name="status" value="ok">
+                <input type="hidden" name="face_image" id="face_image" required>
+                
+                <!-- Hidden field to pass current user's MDA to backend -->
+                <input type="hidden" name="user_mda" value="{{ current_user.mda or '' }}">
 
-            <div id="registerStatus" class="status-ready">Fill all fields to activate camera.</div>
+                <label for="name">Name</label>
+                <input type="text" id="name" name="name" placeholder="Enter full name" value="{{ request.form.name or '' }}" required>
 
-            <div style="display: flex; flex-direction: column; gap: 10px; align-items: center;">
-                <button type="submit" class="btn btn-primary" id="submitBtn" disabled>Register Employee</button>
-                <button type="button" class="btn btn-secondary" onclick="window.location.href='/employees'">🏠 Back to Employees</button>
+                <label for="email">Email</label>
+                <input type="email" id="email" name="email" placeholder="Enter email address" value="{{ request.form.email or '' }}" required>
+
+                <label for="phone">Phone</label>
+                <input type="text" id="phone" name="phone" placeholder="Enter phone number" value="{{ request.form.phone or '' }}" required>
+
+                <label for="role">Role</label>
+                <select id="role" name="role" required>
+                    <option value="user" {% if request.form.role == 'user' %}selected{% endif %}>User (Default)</option>
+                    <option value="admin" {% if request.form.role == 'admin' %}selected{% endif %}>Admin</option>
+                </select>
+
+                <!-- Validation Status -->
+                <div class="validation-status" id="validationStatus">
+                    <i class="fas fa-info-circle"></i>
+                    <span id="statusText">Please fill all fields to enable camera</span>
+                </div>
+
+                <!-- Manual Camera Activation Button -->
+                <button type="button" class="btn btn-camera" id="startCameraBtn" disabled onclick="startRegisterCamera()">
+                    <i class="fas fa-camera me-2"></i>Start Camera
+                </button>
+
+                <!-- AUTO-CAPTURE CAMERA SECTION -->
+                <div id="registerCameraSection" class="camera-section">
+                    <label class="form-label">📸 Position your face in the frame</label>
+                    <div class="camera-container">
+                        <video id="registerVideo" autoplay muted playsinline></video>
+                        <div class="face-guide" id="faceGuide">
+                            <div class="face-guide-label" id="faceGuideLabel">Position face here</div>
+                        </div>
+                    </div>
+                    
+                    <!-- Quality Indicator -->
+                    <div class="quality-bar" id="qualityBar" style="display: none;">
+                        <div class="quality-fill" id="qualityFill" style="width: 0%"></div>
+                    </div>
+                    <div class="quality-text" id="qualityText"></div>
+                    
+                    <!-- Hidden canvas for cropping -->
+                    <canvas id="cropCanvas" style="display:none;"></canvas>
+                    <canvas id="registerCanvas" style="display:none;"></canvas>
+                    
+                    <!-- Cropped Preview -->
+                    <img id="croppedPreview" class="cropped-preview" alt="Cropped Face">
+                    
+                    <!-- Manual Capture Button -->
+                    <button type="button" class="btn btn-capture" id="captureBtn" disabled onclick="manualCapture()">
+                        <i class="fas fa-camera-retro me-2"></i>📸 CLICK TO CAPTURE FACE ONLY
+                    </button>
+                    
+                    <div class="button-group">
+                        <button type="button" class="btn btn-secondary" id="cancelCameraBtn" onclick="cancelCamera()">
+                            ❌ Cancel
+                        </button>
+                    </div>
+                </div>
+
+                <div id="registerStatus" class="status-ready"></div>
+
+                <div style="display: flex; flex-direction: column; gap: 10px; align-items: center;">
+                    <button type="submit" class="btn btn-primary" id="submitBtn" disabled style="display: none;">Register Employee</button>
+                    <button type="button" class="btn btn-secondary" onclick="window.location.href='/employees'">🏠 View Employees</button>
+                </div>
             </div>
         </form>
     </div>
 
+    <!-- Font Awesome for icons -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/js/all.min.js"></script>
+    <!-- Bootstrap JS for alerts -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    
     <script>
+        // Clear all form fields on page load
+        window.addEventListener('load', function() {
+            // Only clear if no form data was submitted
+            {% if not request.form %}
+            document.getElementById('name').value = '';
+            document.getElementById('email').value = '';
+            document.getElementById('phone').value = '';
+            document.getElementById('role').value = 'user';
+            {% endif %}
+            
+            // Clear any existing messages
+            document.getElementById('errorMessage').style.display = 'none';
+            document.getElementById('successMessage').style.display = 'none';
+            
+            // Initial validation check
+            updateValidationStatus();
+        });
+
         let registerStream = null;
-        let registerCountdownTimer = null;
-        let registerFaceDetected = false;
+        let isProcessing = false;
+        let lastDetectionTime = 0;
+        let faceDetected = false;
+        let hasCaptured = false;
+        let isSubmitting = false;
+        let cameraActive = false;
+        let faceFrame = null;
+        const DETECTION_THROTTLE_MS = 300;
+        const FRAME_WIDTH = 132;
+        const FRAME_HEIGHT = 168;
 
         const registerForm = document.getElementById('registerForm');
         const registerStatus = document.getElementById('registerStatus');
         const registerCameraSection = document.getElementById('registerCameraSection');
         const registerVideo = document.getElementById('registerVideo');
-        const registerFaceOverlay = document.getElementById('registerFaceOverlay');
-        const registerCountdown = document.getElementById('registerCountdown');
-        const registerSnapshot = document.getElementById('registerSnapshot');
         const registerCanvas = document.getElementById('registerCanvas');
+        const cropCanvas = document.getElementById('cropCanvas');
+        const croppedPreview = document.getElementById('croppedPreview');
         const submitBtn = document.getElementById('submitBtn');
         const faceImageInput = document.getElementById('face_image');
+        const qualityBar = document.getElementById('qualityBar');
+        const qualityFill = document.getElementById('qualityFill');
+        const qualityText = document.getElementById('qualityText');
+        const errorMessage = document.getElementById('errorMessage');
+        const successMessage = document.getElementById('successMessage');
+        const registrationComplete = document.getElementById('registrationComplete');
+        const formFields = document.getElementById('formFields');
+        const displayEmployeeId = document.getElementById('displayEmployeeId');
+        const employeeDetails = document.getElementById('employeeDetails');
+        const copyFeedback = document.getElementById('copyFeedback');
+        const copyIdBtn = document.getElementById('copyIdBtn');
+        const faceGuide = document.getElementById('faceGuide');
+        const faceGuideLabel = document.getElementById('faceGuideLabel');
+        const emailInput = document.getElementById('email');
+        const phoneInput = document.getElementById('phone');
+        const startCameraBtn = document.getElementById('startCameraBtn');
+        const cancelCameraBtn = document.getElementById('cancelCameraBtn');
+        const captureBtn = document.getElementById('captureBtn');
+        const validationStatus = document.getElementById('validationStatus');
+        const statusText = document.getElementById('statusText');
 
-        // Check if all fields filled
+        function showError(message, field = null) {
+            successMessage.style.display = 'none';
+            registrationComplete.style.display = 'none';
+            
+            errorMessage.textContent = '❌ ' + message;
+            errorMessage.style.display = 'block';
+            
+            if (field === 'email') {
+                emailInput.classList.add('input-duplicate');
+                setTimeout(() => emailInput.classList.remove('input-duplicate'), 2000);
+            } else if (field === 'phone') {
+                phoneInput.classList.add('input-duplicate');
+                setTimeout(() => phoneInput.classList.remove('input-duplicate'), 2000);
+            }
+            
+            setTimeout(() => {
+                errorMessage.style.display = 'none';
+            }, 5000);
+        }
+
+        function showSuccess(message) {
+            errorMessage.style.display = 'none';
+            registrationComplete.style.display = 'none';
+            
+            successMessage.textContent = '✅ ' + message;
+            successMessage.style.display = 'block';
+            
+            setTimeout(() => {
+                successMessage.style.display = 'none';
+            }, 3000);
+        }
+
+        function goToDashboard() {
+            window.location.href = '/dashboard';
+        }
+
+        function goToEmployees() {
+            window.location.href = '/employees';
+        }
+
+        function copyEmployeeId() {
+            const employeeId = displayEmployeeId.textContent;
+            const tempInput = document.createElement('input');
+            tempInput.value = employeeId;
+            document.body.appendChild(tempInput);
+            tempInput.select();
+            document.execCommand('copy');
+            document.body.removeChild(tempInput);
+            
+            copyFeedback.textContent = '✅ Copied to clipboard!';
+            copyIdBtn.classList.add('copied');
+            copyIdBtn.innerHTML = '<span>✓</span> Copied!';
+            
+            setTimeout(() => {
+                copyFeedback.textContent = '';
+                copyIdBtn.classList.remove('copied');
+                copyIdBtn.innerHTML = '<span>📋</span> Copy Employee ID';
+            }, 2000);
+        }
+
+        function extractEmployeeIdFromText(text) {
+            const pattern = /[A-Z]{4}\d{4}/;
+            const match = text.match(pattern);
+            return match ? match[0] : null;
+        }
+
+        function showRegistrationComplete(employeeId, name, email, mda, phone) {
+            errorMessage.style.display = 'none';
+            successMessage.style.display = 'none';
+            
+            displayEmployeeId.textContent = employeeId;
+            
+            employeeDetails.innerHTML = `
+                <div><strong>Name:</strong> ${name}</div>
+                <div><strong>Email:</strong> ${email}</div>
+                <div><strong>MDA:</strong> ${mda}</div>
+                <div><strong>Phone:</strong> ${phone}</div>
+            `;
+            
+            formFields.style.display = 'none';
+            registrationComplete.style.display = 'block';
+        }
+
         function areAllFieldsFilled() {
-            const fields = ['name', 'mda', 'email', 'phone'];
+            const fields = ['name', 'email', 'phone'];
             for (let id of fields) {
                 if (document.getElementById(id).value.trim() === '') return false;
             }
             return true;
         }
 
-        // Update status
+        function updateValidationStatus() {
+            if (areAllFieldsFilled()) {
+                startCameraBtn.disabled = false;
+                validationStatus.classList.add('complete');
+                statusText.innerHTML = '✅ All fields complete! Click "Start Camera" to begin';
+            } else {
+                startCameraBtn.disabled = true;
+                validationStatus.classList.remove('complete');
+                statusText.innerHTML = 'Please fill all fields to enable camera';
+            }
+        }
+
         function updateStatus(message, className = 'ready') {
             registerStatus.textContent = message;
             registerStatus.className = `status-${className}`;
         }
 
-        // Watch form fields
+        // Watch form fields for validation only (no auto camera)
         const inputs = document.querySelectorAll('#registerForm input, #registerForm select');
         inputs.forEach(input => {
-            input.addEventListener('input', () => {
-                if (areAllFieldsFilled() && !registerStream) {
-                    updateStatus("✅ All fields complete! Starting camera...", 'active');
-                    setTimeout(startRegisterCamera, 500);
-                } else if (!areAllFieldsFilled() && registerStream) {
-                    stopRegisterCamera();
-                }
-            });
+            input.addEventListener('input', updateValidationStatus);
         });
 
-        // START CAMERA (EXACT SAME LOGIC)
+        async function detectFaceWithAPI() {
+            if (!registerVideo || !registerVideo.videoWidth || isProcessing || hasCaptured || isSubmitting) return null;
+            
+            const now = Date.now();
+            if (now - lastDetectionTime < DETECTION_THROTTLE_MS) {
+                return null;
+            }
+            
+            lastDetectionTime = now;
+            
+            const canvas = document.createElement('canvas');
+            canvas.width = registerVideo.videoWidth;
+            canvas.height = registerVideo.videoHeight;
+            canvas.getContext('2d').drawImage(registerVideo, 0, 0);
+            const imageData = canvas.toDataURL('image/jpeg', 0.8);
+            
+            try {
+                const response = await fetch('/detect_face', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({image: imageData})
+                });
+                
+                const result = await response.json();
+                return result;
+            } catch (error) {
+                console.error('Face detection API error:', error);
+                return null;
+            }
+        }
+
         function startRegisterCamera() {
+            if (hasCaptured || isSubmitting || cameraActive) return;
+            
+            cameraActive = true;
+            startCameraBtn.style.display = 'none';
+            validationStatus.style.display = 'none';
             registerCameraSection.style.display = 'block';
+            updateStatus("Camera starting...", 'active');
+            
             navigator.mediaDevices.getUserMedia({ 
-                video: { width: 640, height: 480, facingMode: 'user' } 
+                video: { 
+                    width: { ideal: 640 },
+                    height: { ideal: 480 },
+                    facingMode: 'user'
+                } 
             })
             .then(stream => {
                 registerStream = stream;
                 registerVideo.srcObject = stream;
                 registerVideo.onloadedmetadata = () => {
-                    startRegisterFaceDetection();
+                    updateStatus("Camera ready! Position your face in the frame", 'active');
+                    startFaceDetection();
                 };
             })
             .catch(err => {
-                updateStatus("Camera access denied: " + err.message, 'ready');
+                updateStatus("Camera access denied: " + err.message, 'error');
+                showError(`Camera error: ${err.message}`);
+                cancelCamera();
             });
         }
 
-        // STOP CAMERA
-        function stopRegisterCamera() {
-            registerCameraSection.style.display = 'none';
-            if (registerStream) {
-                registerStream.getTracks().forEach(track => track.stop());
-                registerStream = null;
-            }
-            registerFaceDetected = false;
-            if (registerCountdownTimer) clearInterval(registerCountdownTimer);
-            registerSnapshot.style.display = 'none';
-            submitBtn.disabled = true;
-            faceImageInput.value = '';
-        }
-
-        // FACE DETECTION (EXACT SAME LOGIC)
-        function startRegisterFaceDetection() {
-            const detectFaces = () => {
-                const ctx = registerFaceOverlay.getContext('2d');
-                ctx.clearRect(0, 0, registerFaceOverlay.width, registerFaceOverlay.height);
-                
-                const rect = registerVideo.getBoundingClientRect();
-                registerFaceOverlay.width = rect.width;
-                registerFaceOverlay.height = rect.height;
-                
-                // PERFECT CENTERED CIRCLE (EXACT SAME)
-                const radius = Math.min(rect.width, rect.height) / 3;
-                ctx.beginPath();
-                ctx.arc(rect.width/2, rect.height/2, radius, 0, 2 * Math.PI);
-                ctx.strokeStyle = registerFaceDetected ? '#00ff00' : '#ff4444';
-                ctx.lineWidth = 6;
-                ctx.shadowColor = registerFaceDetected ? '#00ff00' : '#ff4444';
-                ctx.shadowBlur = 20;
-                ctx.stroke();
-                
-                // Face detection (center brightness - EXACT SAME)
-                const canvasTemp = document.createElement('canvas');
-                canvasTemp.width = 100; canvasTemp.height = 100;
-                const tempCtx = canvasTemp.getContext('2d');
-                tempCtx.drawImage(registerVideo, rect.width/2-50, rect.height/2-50, 100, 100, 0, 0, 100, 100);
-                
-                const imageData = tempCtx.getImageData(0, 0, 100, 100);
-                let brightness = 0;
-                for (let i = 0; i < imageData.data.length; i += 4) {
-                    brightness += imageData.data[i] + imageData.data[i+1] + imageData.data[i+2];
+        function startFaceDetection() {
+            const detectFaces = async () => {
+                if (isProcessing || hasCaptured || isSubmitting) {
+                    requestAnimationFrame(detectFaces);
+                    return;
                 }
-                brightness /= (imageData.data.length / 4 * 3);
                 
-                registerFaceDetected = brightness > 80 && brightness < 180;
+                const result = await detectFaceWithAPI();
                 
-                if (registerFaceDetected) startRegisterCountdown();
+                if (result && result.face_detected && !isProcessing && !hasCaptured && !isSubmitting) {
+                    faceDetected = true;
+                    qualityBar.style.display = 'block';
+                    qualityFill.style.width = `${result.quality * 100}%`;
+                    qualityText.textContent = `Face quality: ${Math.round(result.quality * 100)}%`;
+                    
+                    faceGuide.classList.add('face-detected');
+                    faceGuideLabel.textContent = '✅ Face detected!';
+                    
+                    // Enable capture button
+                    captureBtn.disabled = false;
+                    updateStatus("Face detected! Click CAPTURE button", 'face');
+                } else {
+                    faceDetected = false;
+                    qualityBar.style.display = 'none';
+                    qualityText.textContent = '';
+                    faceGuide.classList.remove('face-detected');
+                    faceGuideLabel.textContent = 'Position face here';
+                    
+                    // Disable capture button
+                    captureBtn.disabled = true;
+                }
+                
                 requestAnimationFrame(detectFaces);
             };
             detectFaces();
         }
 
-        // COUNTDOWN (EXACT SAME)
-        function startRegisterCountdown() {
-            if (registerCountdownTimer) clearInterval(registerCountdownTimer);
-            let count = 3;
-            registerCountdown.style.display = 'block';
-            registerCountdownTimer = setInterval(() => {
-                count--;
-                registerCountdown.textContent = count;
-                if (count <= 0) {
-                    clearInterval(registerCountdownTimer);
-                    registerAutoSnap();
-                }
-            }, 1000);
+        function cropFaceFromFrame() {
+            const video = registerVideo;
+            const videoWidth = video.videoWidth;
+            const videoHeight = video.videoHeight;
+            
+            // Get the position of the face guide relative to video
+            const rect = registerVideo.getBoundingClientRect();
+            const guideRect = faceGuide.getBoundingClientRect();
+            
+            // Calculate the face guide position in video coordinates
+            const scaleX = videoWidth / rect.width;
+            const scaleY = videoHeight / rect.height;
+            
+            const guideLeft = (guideRect.left - rect.left) * scaleX;
+            const guideTop = (guideRect.top - rect.top) * scaleY;
+            const guideWidth = guideRect.width * scaleX;
+            const guideHeight = guideRect.height * scaleY;
+            
+            // Set crop canvas size to frame dimensions
+            cropCanvas.width = FRAME_WIDTH * 2; // Double size for better quality
+            cropCanvas.height = FRAME_HEIGHT * 2;
+            
+            // Draw the cropped face
+            const ctx = cropCanvas.getContext('2d');
+            ctx.drawImage(
+                video,
+                guideLeft, guideTop, guideWidth, guideHeight,
+                0, 0, cropCanvas.width, cropCanvas.height
+            );
+            
+            return cropCanvas.toDataURL('image/jpeg', 0.9);
         }
 
-        // AUTO SNAP (EXACT SAME)
-        function registerAutoSnap() {
-            registerCanvas.width = registerVideo.videoWidth;
-            registerCanvas.height = registerVideo.videoHeight;
-            registerCanvas.getContext('2d').drawImage(registerVideo, 0, 0);
-            const imageData = registerCanvas.toDataURL('image/png', 0.9);
-            faceImageInput.value = imageData;
-            registerSnapshot.src = imageData;
-            registerSnapshot.style.display = 'block';
-            submitBtn.disabled = false;
-            submitBtn.style.display = 'block';
+        function manualCapture() {
+            if (isProcessing || hasCaptured || isSubmitting || !faceDetected) return;
+            
+            isProcessing = true;
+            hasCaptured = true;
+            
+            // Flash effect
+            registerVideo.classList.add('flash-message');
+            setTimeout(() => registerVideo.classList.remove('flash-message'), 200);
+            
+            // Crop face from frame
+            const croppedImageData = cropFaceFromFrame();
+            
+            // Save cropped image
+            faceImageInput.value = croppedImageData;
+            
+            // Show preview of cropped face
+            croppedPreview.src = croppedImageData;
+            croppedPreview.style.display = 'block';
+            
+            // Disable capture button
+            captureBtn.disabled = true;
+            captureBtn.style.display = 'none';
+            
+            updateStatus("✅ Face captured! Registering...", 'success');
+            
+            // Stop camera
+            stopRegisterCamera();
+            
+            // Submit registration immediately
+            submitRegistration();
         }
 
-        // FORM SUBMIT
-        registerForm.onsubmit = function(e) {
-            e.preventDefault();
-            if (!faceImageInput.value) {
-                alert('Please wait for auto-capture!');
-                return false;
+        function cancelCamera() {
+            stopRegisterCamera();
+            cameraActive = false;
+            registerCameraSection.style.display = 'none';
+            startCameraBtn.style.display = 'block';
+            validationStatus.style.display = 'block';
+            captureBtn.disabled = true;
+            updateValidationStatus();
+            updateStatus('', 'ready');
+        }
+
+        function stopRegisterCamera() {
+            if (registerStream) {
+                registerStream.getTracks().forEach(track => track.stop());
+                registerStream = null;
             }
-            this.submit();
-        };
+            isProcessing = false;
+            faceDetected = false;
+            faceGuide.classList.remove('face-detected');
+            faceGuideLabel.textContent = 'Position face here';
+        }
 
-        // CLEANUP
+        function submitRegistration() {
+            if (isSubmitting) return;
+            isSubmitting = true;
+            
+            const formData = new FormData(registerForm);
+            const name = document.getElementById('name').value;
+            const email = document.getElementById('email').value;
+            const phone = document.getElementById('phone').value;
+            
+            // Get the current user's MDA from the hidden field
+            const userMda = document.querySelector('input[name="user_mda"]').value;
+            
+            updateStatus('Registering...', 'active');
+            
+            fetch('/register', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.text())
+            .then(text => {
+                let employeeId = extractEmployeeIdFromText(text);
+                
+                if (employeeId) {
+                    showRegistrationComplete(employeeId, name, email, userMda, phone);
+                    return;
+                }
+                
+                if (text.includes('Email') && text.includes('already registered')) {
+                    showError('This email address is already registered to another employee.', 'email');
+                    resetForm();
+                    return;
+                }
+                
+                if (text.includes('Phone') && text.includes('already registered')) {
+                    showError('This phone number is already registered to another employee.', 'phone');
+                    resetForm();
+                    return;
+                }
+                
+                if (text.includes('UNIQUE constraint failed')) {
+                    if (text.includes('employee.email')) {
+                        showError('This email address is already registered to another employee.', 'email');
+                    } else if (text.includes('employee.phone')) {
+                        showError('This phone number is already registered to another employee.', 'phone');
+                    } else {
+                        showError('This employee information already exists in the database.');
+                    }
+                    resetForm();
+                    return;
+                }
+                
+                showError('Registration failed. Please try again.');
+                resetForm();
+            })
+            .catch(error => {
+                showError('Registration failed. Please try again.');
+                resetForm();
+            });
+        }
+
+        function resetForm() {
+            isProcessing = false;
+            faceDetected = false;
+            hasCaptured = false;
+            isSubmitting = false;
+            cameraActive = false;
+            faceImageInput.value = '';
+            
+            errorMessage.style.display = 'none';
+            successMessage.style.display = 'none';
+            
+            registerCameraSection.style.display = 'none';
+            startCameraBtn.style.display = 'block';
+            validationStatus.style.display = 'block';
+            captureBtn.disabled = true;
+            captureBtn.style.display = 'block';
+            croppedPreview.style.display = 'none';
+            updateValidationStatus();
+            updateStatus('', 'ready');
+        }
+
         window.onbeforeunload = () => stopRegisterCamera();
     </script>
 </body>

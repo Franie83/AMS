@@ -1,0 +1,195 @@
+{% extends "layout.html" %}
+{% block body %}
+<div class="container-fluid mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h3>👥 User Management (Admin)</h3>
+        <div>
+            <a href="{{ url_for('admin_add_user') }}" class="btn btn-success">
+                <i class="fas fa-user-plus"></i> Add New User
+            </a>
+        </div>
+    </div>
+    
+    <!-- Search Bar -->
+    <div class="card mb-4">
+        <div class="card-body">
+            <form method="get" class="row g-3">
+                <div class="col-md-10">
+                    <input type="text" class="form-control" name="search" placeholder="Search by name, email, or MDA..." value="{{ search }}">
+                </div>
+                <div class="col-md-2">
+                    <button type="submit" class="btn btn-primary w-100">🔍 Search</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    
+    <!-- Users Table -->
+    <div class="card">
+        <div class="card-header bg-light d-flex justify-content-between align-items-center">
+            <h5 class="mb-0">System Users</h5>
+            <span class="badge bg-primary">Total: {{ users.total }}</span>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-hover">
+                    <thead class="table-dark">
+                        <tr>
+                            <th>ID</th>
+                            <th>Name</th>
+                            <th>Email</th>
+                            <th>Phone</th>
+                            <th>MDA</th>
+                            <th>Role</th>
+                            <th>Created</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for user in users.items %}
+                        <tr>
+                            <td>{{ user.id }}</td>
+                            <td><strong>{{ user.name }}</strong></td>
+                            <td>{{ user.email }}</td>
+                            <td>{{ user.phone or 'N/A' }}</td>
+                            <td>{{ user.mda or 'N/A' }}</td>
+                            <td>
+                                {% if user.role == 'admin' %}
+                                <span class="badge bg-danger">Admin</span>
+                                {% else %}
+                                <span class="badge bg-primary">User</span>
+                                {% endif %}
+                            </td>
+                            <td>{{ user.created_at.strftime('%Y-%m-%d') if user.created_at else 'N/A' }}</td>
+                            <td>
+                                <div class="btn-group btn-group-sm" role="group">
+                                    <a href="{{ url_for('admin_edit_user', id=user.id) }}" class="btn btn-outline-primary" title="Edit">
+                                        <i class="fas fa-edit"></i>
+                                    </a>
+                                    {% if user.id != current_user.id %}
+                                    <button class="btn btn-outline-danger" onclick="deleteUser({{ user.id }}, '{{ user.name }}')" title="Delete">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                    {% else %}
+                                    <button class="btn btn-outline-secondary" disabled title="Cannot delete yourself">
+                                        <i class="fas fa-trash"></i>
+                                    </button>
+                                    {% endif %}
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            
+            <!-- Pagination -->
+            {% if users.pages > 1 %}
+            <nav aria-label="User pagination">
+                <ul class="pagination justify-content-center">
+                    {% if users.has_prev %}
+                    <li class="page-item">
+                        <a class="page-link" href="{{ url_for('admin_users', page=users.prev_num, search=search) }}">Previous</a>
+                    </li>
+                    {% else %}
+                    <li class="page-item disabled">
+                        <span class="page-link">Previous</span>
+                    </li>
+                    {% endif %}
+                    
+                    {% for page_num in users.iter_pages(left_edge=1, right_edge=1, left_current=2, right_current=2) %}
+                        {% if page_num %}
+                            {% if page_num == users.page %}
+                            <li class="page-item active">
+                                <span class="page-link">{{ page_num }}</span>
+                            </li>
+                            {% else %}
+                            <li class="page-item">
+                                <a class="page-link" href="{{ url_for('admin_users', page=page_num, search=search) }}">{{ page_num }}</a>
+                            </li>
+                            {% endif %}
+                        {% else %}
+                            <li class="page-item disabled">
+                                <span class="page-link">...</span>
+                            </li>
+                        {% endif %}
+                    {% endfor %}
+                    
+                    {% if users.has_next %}
+                    <li class="page-item">
+                        <a class="page-link" href="{{ url_for('admin_users', page=users.next_num, search=search) }}">Next</a>
+                    </li>
+                    {% else %}
+                    <li class="page-item disabled">
+                        <span class="page-link">Next</span>
+                    </li>
+                    {% endif %}
+                </ul>
+            </nav>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- Delete Confirmation Modal -->
+<div class="modal fade" id="deleteModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title text-danger">Confirm Delete</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p>Are you sure you want to delete user <strong id="deleteUserName"></strong>?</p>
+                <p class="text-muted small">This action cannot be undone.</p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-danger" id="confirmDeleteBtn">Delete</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+let deleteModal;
+let currentUserId = null;
+
+document.addEventListener('DOMContentLoaded', function() {
+    deleteModal = new bootstrap.Modal(document.getElementById('deleteModal'));
+});
+
+function deleteUser(id, name) {
+    currentUserId = id;
+    document.getElementById('deleteUserName').textContent = name;
+    deleteModal.show();
+}
+
+document.getElementById('confirmDeleteBtn').addEventListener('click', function() {
+    if (!currentUserId) return;
+    
+    fetch(`/admin/users/delete/${currentUserId}`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.status === 'ok') {
+            alert(data.msg);
+            window.location.reload();
+        } else {
+            alert('Error: ' + data.msg);
+        }
+    })
+    .catch(error => {
+        alert('Network error: ' + error);
+    })
+    .finally(() => {
+        deleteModal.hide();
+        currentUserId = null;
+    });
+});
+</script>
+{% endblock %}

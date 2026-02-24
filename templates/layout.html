@@ -4,46 +4,267 @@
   <meta charset="utf-8">
   <title>Attendance App</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
-  <style> .camera { width: 480px; height:360px; border:1px solid #ddd; }</style>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+  <style>
+    .camera { width: 480px; height:360px; border:1px solid #ddd; }
+    .navbar-nav .nav-link {
+      padding: 0.5rem 1rem;
+      transition: all 0.3s ease;
+    }
+    .navbar-nav .nav-link:hover {
+      background-color: rgba(255,255,255,0.1);
+      border-radius: 5px;
+    }
+    .dropdown-menu {
+      background-color: #f8f9fa;
+      border: none;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    }
+    .dropdown-item {
+      padding: 0.5rem 1.5rem;
+      transition: all 0.2s ease;
+    }
+    .dropdown-item:hover {
+      background-color: #007bff;
+      color: white;
+    }
+    .dropdown-item i {
+      width: 20px;
+      margin-right: 8px;
+    }
+    .badge-role {
+      font-size: 0.7rem;
+      padding: 0.2rem 0.5rem;
+      border-radius: 20px;
+      margin-left: 8px;
+    }
+    .role-superadmin {
+      background-color: #8e44ad;
+      color: white;
+    }
+    .role-admin {
+      background-color: #dc3545;
+      color: white;
+    }
+    .role-user {
+      background-color: #28a745;
+      color: white;
+    }
+  </style>
 </head>
 <body class="bg-light">
 <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
   <div class="container-fluid">
-    <a class="navbar-brand" href="{{ url_for('dashboard') }}">Attendance</a>
-    <div class="collapse navbar-collapse">
+    <a class="navbar-brand" href="{{ url_for('dashboard') }}">
+      <i class="fas fa-clock me-2"></i>Attendance System
+    </a>
+    <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+      <span class="navbar-toggler-icon"></span>
+    </button>
+    <div class="collapse navbar-collapse" id="navbarNav">
       <ul class="navbar-nav ms-auto">
         {% if current_user.is_authenticated %}
-          <li class="nav-item"><a class="nav-link" href="{{ url_for('dashboard') }}">Dashboard</a></li>
-          <li class="nav-item"><a class="nav-link" href="{{ url_for('employees') }}">Employees</a></li>
-          <li class="nav-item"><a class="nav-link" href="{{ url_for('timesheet') }}">Timesheet</a></li>
-          <li class="nav-item"><a class="nav-link" href="{{ url_for('register') }}">Register</a></li>
-          <li class="nav-item"><a class="nav-link" href="{{ url_for('take_attendance') }}">Take Attendance</a></li>
+          
+          <!-- Common Navigation for ALL authenticated users -->
           <li class="nav-item">
-            <a href="{{ url_for('office') }}" class="nav-link btn btn-outline-light">🏢 Office</a>
+            <a class="nav-link" href="{{ url_for('take_attendance') }}">
+              <i class="fas fa-camera me-1"></i>Take Attendance
+            </a>
           </li>
-          <li class="nav-item"><a class="nav-link" href="{{ url_for('logout') }}">Logout</a></li>
+          <li class="nav-item">
+            <a class="nav-link" href="{{ url_for('register') }}">
+              <i class="fas fa-user-plus me-1"></i>Register
+            </a>
+          </li>
+          <li class="nav-item">
+            <a href="{{ url_for('office') }}" class="nav-link">
+              <i class="fas fa-building me-1"></i>Office
+            </a>
+          </li>
+          
+          <!-- Admin and Super Admin Navigation (Dashboard, Employees, Timesheet) -->
+          {% if current_user.role == 'superadmin' or current_user.role == 'admin' %}
+            <li class="nav-item">
+              <a class="nav-link" href="{{ url_for('dashboard') }}">
+                <i class="fas fa-chart-bar me-1"></i>Dashboard
+              </a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link" href="{{ url_for('employees') }}">
+                <i class="fas fa-users me-1"></i>Employees
+              </a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link" href="{{ url_for('timesheet') }}">
+                <i class="fas fa-calendar-alt me-1"></i>Timesheet
+              </a>
+            </li>
+          {% endif %}
+          
+          <!-- Super Admin Dropdown (only for superadmin) -->
+          {% if current_user.role == 'superadmin' %}
+            <li class="nav-item dropdown">
+              <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                <i class="fas fa-crown me-1"></i>Super Admin
+              </a>
+              <ul class="dropdown-menu dropdown-menu-end">
+                <li>
+                  <a class="dropdown-item" href="{{ url_for('admin_users') }}">
+                    <i class="fas fa-users-cog"></i> Manage Users
+                  </a>
+                </li>
+                <li><hr class="dropdown-divider"></li>
+                <li>
+                  <a class="dropdown-item" href="{{ url_for('mismatch') }}">
+                    <i class="fas fa-exclamation-triangle text-warning"></i> Fraud Detection
+                  </a>
+                </li>
+                <li>
+                  <a class="dropdown-item" href="{{ url_for('export_excel') }}">
+                    <i class="fas fa-file-excel text-success"></i> Export Excel
+                  </a>
+                </li>
+                <li>
+                  <a class="dropdown-item" href="{{ url_for('export_pdf') }}">
+                    <i class="fas fa-file-pdf text-danger"></i> Export PDF
+                  </a>
+                </li>
+                <li><hr class="dropdown-divider"></li>
+                <li>
+                  <a class="dropdown-item" href="{{ url_for('setup') }}">
+                    <i class="fas fa-tools"></i> System Setup
+                  </a>
+                </li>
+              </ul>
+            </li>
+          {% endif %}
+          
+          <!-- Admin Dropdown (only for admin - limited access) -->
+          {% if current_user.role == 'admin' %}
+            <li class="nav-item dropdown">
+              <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                <i class="fas fa-shield-alt me-1"></i>Admin
+              </a>
+              <ul class="dropdown-menu dropdown-menu-end">
+                <li>
+                  <a class="dropdown-item" href="{{ url_for('mismatch') }}">
+                    <i class="fas fa-exclamation-triangle text-warning"></i> Fraud Detection
+                  </a>
+                </li>
+                <li>
+                  <a class="dropdown-item" href="{{ url_for('export_excel') }}">
+                    <i class="fas fa-file-excel text-success"></i> Export Excel
+                  </a>
+                </li>
+                <li>
+                  <a class="dropdown-item" href="{{ url_for('export_pdf') }}">
+                    <i class="fas fa-file-pdf text-danger"></i> Export PDF
+                  </a>
+                </li>
+              </ul>
+            </li>
+          {% endif %}
+          
+          <!-- User Info & Logout (Common for all) -->
+          <li class="nav-item dropdown">
+            <a class="nav-link dropdown-toggle" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+              <i class="fas fa-user-circle me-1"></i>
+              {{ current_user.name or current_user.email }}
+              {% if current_user.role == 'superadmin' %}
+                <span class="badge-role role-superadmin">Super Admin</span>
+              {% elif current_user.role == 'admin' %}
+                <span class="badge-role role-admin">Admin</span>
+              {% else %}
+                <span class="badge-role role-user">User</span>
+              {% endif %}
+            </a>
+            <ul class="dropdown-menu dropdown-menu-end">
+              <li>
+                <span class="dropdown-item-text">
+                  <i class="fas fa-envelope me-2"></i>{{ current_user.email }}
+                </span>
+              </li>
+              <li>
+                <span class="dropdown-item-text">
+                  <i class="fas fa-building me-2"></i>{{ current_user.mda or 'No MDA' }}
+                </span>
+              </li>
+              <li>
+                <span class="dropdown-item-text">
+                  <i class="fas fa-tag me-2"></i>Role: 
+                  {% if current_user.role == 'superadmin' %}
+                    <span class="badge" style="background-color: #8e44ad;">Super Admin</span>
+                  {% elif current_user.role == 'admin' %}
+                    <span class="badge bg-danger">Admin</span>
+                  {% else %}
+                    <span class="badge bg-primary">User</span>
+                  {% endif %}
+                </span>
+              </li>
+              <li><hr class="dropdown-divider"></li>
+              <li>
+                <a class="dropdown-item" href="{{ url_for('logout') }}">
+                  <i class="fas fa-sign-out-alt me-2"></i>Logout
+                </a>
+              </li>
+            </ul>
+          </li>
+          
         {% else %}
-          <li class="nav-item"><a class="nav-link" href="{{ url_for('login') }}">Login</a></li>
+          <!-- Public Navigation (not logged in) -->
+          <li class="nav-item">
+            <a class="nav-link" href="{{ url_for('login') }}">
+              <i class="fas fa-sign-in-alt me-1"></i>Login
+            </a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" href="{{ url_for('signup') }}">
+              <i class="fas fa-user-plus me-1"></i>Sign Up
+            </a>
+          </li>
         {% endif %}
       </ul>
     </div>
   </div>
 </nav>
 
-
 <div class="container mt-4">
   {% with messages = get_flashed_messages(with_categories=true) %}
     {% if messages %}
       {% for category, msg in messages %}
-        <div class="alert alert-{{ category }} alert-dismissible fade show">
-          {{ msg }} <button class="btn-close" data-bs-dismiss="alert"></button>
+        <div class="alert alert-{{ category if category != 'message' else 'info' }} alert-dismissible fade show shadow-sm" role="alert">
+          <div class="d-flex align-items-center">
+            {% if category == 'success' %}
+              <i class="fas fa-check-circle me-2 fs-5"></i>
+            {% elif category == 'danger' or category == 'error' %}
+              <i class="fas fa-exclamation-circle me-2 fs-5"></i>
+            {% elif category == 'warning' %}
+              <i class="fas fa-exclamation-triangle me-2 fs-5"></i>
+            {% elif category == 'info' %}
+              <i class="fas fa-info-circle me-2 fs-5"></i>
+            {% endif %}
+            <span>{{ msg }}</span>
+          </div>
+          <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
         </div>
       {% endfor %}
     {% endif %}
   {% endwith %}
+  
   {% block body %}{% endblock %}
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+  // Auto-dismiss alerts after 5 seconds
+  document.addEventListener('DOMContentLoaded', function() {
+    setTimeout(function() {
+      document.querySelectorAll('.alert').forEach(function(alert) {
+        let bsAlert = new bootstrap.Alert(alert);
+        bsAlert.close();
+      });
+    }, 5000);
+  });
+</script>
 </body>
 </html>

@@ -1,37 +1,585 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Sign Up</title>
+    <title>Sign Up - Attendance System</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        .signup-card {
+            max-width: 500px;
+            width: 100%;
+        }
+        .card {
+            border: none;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+        .card-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 15px 15px 0 0 !important;
+            padding: 20px;
+            text-align: center;
+        }
+        .card-header h3 {
+            margin: 0;
+            font-weight: 600;
+        }
+        .card-body {
+            padding: 30px;
+        }
+        .form-control {
+            border-radius: 10px;
+            padding: 12px;
+            border: 2px solid #e1e5e9;
+            transition: all 0.3s ease;
+        }
+        .form-control:focus {
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border: none;
+            border-radius: 10px;
+            padding: 12px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+        }
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
+        }
+        .btn-success {
+            background: #28a745;
+            border: none;
+            border-radius: 10px;
+            padding: 12px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+        }
+        .btn-success:hover {
+            background: #218838;
+            transform: translateY(-2px);
+        }
+        .login-link {
+            text-align: center;
+            margin-top: 20px;
+            color: #666;
+        }
+        .login-link a {
+            color: #667eea;
+            text-decoration: none;
+            font-weight: 600;
+        }
+        .login-link a:hover {
+            text-decoration: underline;
+        }
+        .camera-section {
+            margin-top: 20px;
+            position: relative;
+        }
+        .camera-container {
+            position: relative;
+            width: 100%;
+            height: 280px;
+            background: #000;
+            border-radius: 10px;
+            overflow: hidden;
+            margin-bottom: 15px;
+        }
+        #signupVideo {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        .face-guide {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 120px;
+            height: 150px;
+            border: 3px solid rgba(255, 255, 255, 0.8);
+            border-radius: 50% 50% 45% 45% / 55% 55% 45% 45%;
+            box-shadow: 0 0 0 2000px rgba(0, 0, 0, 0.6);
+            pointer-events: none;
+            transition: border-color 0.3s ease;
+        }
+        .face-guide.face-detected {
+            border-color: #28a745;
+            box-shadow: 0 0 0 2000px rgba(0, 0, 0, 0.6), 0 0 20px #28a745;
+        }
+        .face-guide-label {
+            position: absolute;
+            bottom: -30px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: white;
+            font-size: 12px;
+            white-space: nowrap;
+            text-shadow: 1px 1px 2px black;
+            background: rgba(0,0,0,0.7);
+            padding: 4px 12px;
+            border-radius: 20px;
+        }
+        #signupStatus {
+            text-align: center;
+            margin: 10px 0;
+            font-weight: 600;
+            min-height: 24px;
+        }
+        .status-success {
+            color: #28a745;
+        }
+        .status-warning {
+            color: #ffc107;
+        }
+        .status-error {
+            color: #dc3545;
+        }
+        .quality-bar {
+            width: 100%;
+            height: 8px;
+            background: #e9ecef;
+            border-radius: 4px;
+            margin: 10px 0;
+            overflow: hidden;
+        }
+        .quality-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #28a745, #20c997);
+            transition: width 0.3s ease;
+        }
+        #signupSnapshot {
+            max-width: 100%;
+            border-radius: 10px;
+            display: none;
+            margin-top: 10px;
+            border: 3px solid #28a745;
+        }
+        .flash-message {
+            animation: flash 0.2s ease-out;
+        }
+        @keyframes flash {
+            0% { opacity: 1; }
+            50% { opacity: 0.3; }
+            100% { opacity: 1; }
+        }
+        .enter-hint {
+            background: #e9ecef;
+            padding: 10px;
+            border-radius: 5px;
+            margin: 15px 0;
+            text-align: center;
+            font-size: 14px;
+            color: #667eea;
+            font-weight: 600;
+            border: 2px dashed #667eea;
+        }
+        .enter-hint i {
+            margin-right: 5px;
+        }
+        kbd {
+            background-color: #333;
+            color: white;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        .btn-secondary {
+            background: #6c757d;
+            border: none;
+        }
+        .btn-secondary:hover {
+            background: #5a6268;
+        }
+        .all-fields-complete {
+            background-color: #d4edda;
+            border-color: #28a745;
+            color: #155724;
+        }
+    </style>
 </head>
 <body>
-    <h2>Create an Account</h2>
+    <div class="signup-card">
+        <div class="card">
+            <div class="card-header">
+                <h3>📝 Create Account</h3>
+                <p class="mb-0">Join the Attendance System</p>
+            </div>
+            <div class="card-body">
+                {% with messages = get_flashed_messages(with_categories=true) %}
+                    {% if messages %}
+                        {% for category, message in messages %}
+                            <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+                                {{ message }}
+                                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                            </div>
+                        {% endfor %}
+                    {% endif %}
+                {% endwith %}
+                
+                <form method="POST" action="{{ url_for('signup') }}" id="signupForm" enctype="multipart/form-data">
+                    <div class="mb-3">
+                        <label for="name" class="form-label">Full Name</label>
+                        <input type="text" class="form-control" id="name" name="name" placeholder="Enter your full name" required>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="email" class="form-label">Email Address</label>
+                        <input type="email" class="form-control" id="email" name="email" placeholder="Enter your email" required>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="mda" class="form-label">MDA (Ministry/Department/Agency)</label>
+                        <input type="text" class="form-control" id="mda" name="mda" placeholder="Enter your MDA" required>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="phone" class="form-label">Phone Number</label>
+                        <input type="tel" class="form-control" id="phone" name="phone" placeholder="Enter your phone number" required>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="password" class="form-label">Password</label>
+                        <input type="password" class="form-control" id="password" name="password" placeholder="Create a password" required minlength="6">
+                        <div class="form-text">Minimum 6 characters</div>
+                    </div>
 
-    <form method="POST">
-        {{ form.hidden_tag() }}
+                    <!-- Enter Key Hint -->
+                    <div class="enter-hint" id="enterHint">
+                        <i class="fas fa-keyboard"></i> 
+                        <span id="hintText">Fill all fields then press <kbd>Enter</kbd> to start face capture</span>
+                    </div>
 
-        <p>
-            {{ form.username.label }}<br>
-            {{ form.username(size=32) }}
-        </p>
-
-        <p>
-            {{ form.email.label }}<br>
-            {{ form.email(size=32) }}
-        </p>
-
-        <p>
-            {{ form.password.label }}<br>
-            {{ form.password(size=32) }}
-        </p>
-
-        <p>
-            {{ form.confirm_password.label }}<br>
-            {{ form.confirm_password(size=32) }}
-        </p>
-
-        <p>{{ form.submit() }}</p>
-    </form>
-
-    <p>Already have an account? <a href="{{ url_for('login') }}">Login here</a></p>
+                    <!-- Face Capture Section (Initially Hidden) -->
+                    <div id="faceCaptureSection" style="display: none;">
+                        <hr>
+                        <h5 class="text-center mb-3">📸 Face Capture</h5>
+                        <div class="camera-section">
+                            <div class="camera-container">
+                                <video id="signupVideo" autoplay muted playsinline></video>
+                                <div class="face-guide" id="faceGuide">
+                                    <div class="face-guide-label" id="faceGuideLabel">Position face here</div>
+                                </div>
+                            </div>
+                            
+                            <div id="signupStatus"></div>
+                            
+                            <div class="quality-bar" id="qualityBar" style="display: none;">
+                                <div class="quality-fill" id="qualityFill" style="width: 0%"></div>
+                            </div>
+                            
+                            <canvas id="signupCanvas" style="display:none;"></canvas>
+                            <img id="signupSnapshot" alt="Captured Face">
+                            
+                            <input type="hidden" name="face_image" id="face_image">
+                            
+                            <button type="button" class="btn btn-success w-100 mt-2" id="recaptureBtn" style="display: none;" onclick="restartCamera()">
+                                🔄 Retake Photo
+                            </button>
+                            <button type="button" class="btn btn-secondary w-100 mt-2" id="cancelBtn" onclick="cancelCamera()">
+                                ❌ Cancel
+                            </button>
+                        </div>
+                    </div>
+                </form>
+                
+                <div class="login-link">
+                    Already have an account? <a href="{{ url_for('login') }}">Login here</a>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Font Awesome for icons -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/js/all.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <script>
+        let signupStream = null;
+        let isProcessing = false;
+        let hasCaptured = false;
+        let lastDetectionTime = 0;
+        let cameraActive = false;
+        let enterPressed = false; // Flag to prevent multiple Enter triggers
+        const DETECTION_THROTTLE_MS = 300;
+        
+        const signupForm = document.getElementById('signupForm');
+        const faceCaptureSection = document.getElementById('faceCaptureSection');
+        const signupVideo = document.getElementById('signupVideo');
+        const signupCanvas = document.getElementById('signupCanvas');
+        const signupSnapshot = document.getElementById('signupSnapshot');
+        const faceGuide = document.getElementById('faceGuide');
+        const faceGuideLabel = document.getElementById('faceGuideLabel');
+        const signupStatus = document.getElementById('signupStatus');
+        const qualityBar = document.getElementById('qualityBar');
+        const qualityFill = document.getElementById('qualityFill');
+        const faceImageInput = document.getElementById('face_image');
+        const recaptureBtn = document.getElementById('recaptureBtn');
+        const cancelBtn = document.getElementById('cancelBtn');
+        const enterHint = document.getElementById('enterHint');
+        const hintText = document.getElementById('hintText');
+        
+        // Get all input fields
+        const nameInput = document.getElementById('name');
+        const emailInput = document.getElementById('email');
+        const mdaInput = document.getElementById('mda');
+        const phoneInput = document.getElementById('phone');
+        const passwordInput = document.getElementById('password');
+        
+        // Function to check if all fields are filled
+        function areAllFieldsFilled() {
+            return nameInput.value.trim() !== '' &&
+                   emailInput.value.trim() !== '' &&
+                   mdaInput.value.trim() !== '' &&
+                   phoneInput.value.trim() !== '' &&
+                   passwordInput.value.trim() !== '';
+        }
+        
+        // Update hint based on field status
+        function updateHint() {
+            if (areAllFieldsFilled()) {
+                hintText.innerHTML = '✅ All fields filled! Press <kbd>Enter</kbd> to start face capture';
+                enterHint.classList.add('all-fields-complete');
+            } else {
+                hintText.innerHTML = 'Fill all fields then press <kbd>Enter</kbd> to start face capture';
+                enterHint.classList.remove('all-fields-complete');
+            }
+        }
+        
+        // Add input listeners to all fields to update hint
+        nameInput.addEventListener('input', updateHint);
+        emailInput.addEventListener('input', updateHint);
+        mdaInput.addEventListener('input', updateHint);
+        phoneInput.addEventListener('input', updateHint);
+        passwordInput.addEventListener('input', updateHint);
+        
+        // Handle Enter key press on the entire document
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') {
+                e.preventDefault(); // Prevent default form submission
+                
+                // Only trigger if not already processing and all fields are filled
+                if (!cameraActive && !enterPressed && areAllFieldsFilled()) {
+                    enterPressed = true; // Set flag to prevent multiple triggers
+                    startFaceCapture();
+                } else if (!areAllFieldsFilled()) {
+                    alert('Please fill in all fields before pressing Enter');
+                }
+            }
+        });
+        
+        // Reset enter flag when key is released
+        document.addEventListener('keyup', function(e) {
+            if (e.key === 'Enter') {
+                setTimeout(() => {
+                    enterPressed = false;
+                }, 500); // Reset after half a second
+            }
+        });
+        
+        function startFaceCapture() {
+            if (cameraActive) return;
+            
+            cameraActive = true;
+            
+            // Hide the form fields and show camera section
+            document.querySelectorAll('.form-control').forEach(field => {
+                field.style.display = 'none';
+            });
+            document.querySelectorAll('.form-label').forEach(label => {
+                label.style.display = 'none';
+            });
+            document.querySelector('.form-text').style.display = 'none';
+            enterHint.style.display = 'none';
+            
+            faceCaptureSection.style.display = 'block';
+            
+            // Start camera
+            startSignupCamera();
+        }
+        
+        function cancelCamera() {
+            // Stop camera if running
+            if (signupStream) {
+                signupStream.getTracks().forEach(track => track.stop());
+                signupStream = null;
+            }
+            
+            cameraActive = false;
+            enterPressed = false; // Reset enter flag
+            
+            // Hide camera section and show form fields again
+            faceCaptureSection.style.display = 'none';
+            
+            document.querySelectorAll('.form-control').forEach(field => {
+                field.style.display = 'block';
+            });
+            document.querySelectorAll('.form-label').forEach(label => {
+                label.style.display = 'block';
+            });
+            document.querySelector('.form-text').style.display = 'block';
+            enterHint.style.display = 'block';
+        }
+        
+        async function detectFaceWithAPI() {
+            if (!signupVideo || !signupVideo.videoWidth || isProcessing || hasCaptured) return null;
+            
+            const now = Date.now();
+            if (now - lastDetectionTime < DETECTION_THROTTLE_MS) {
+                return null;
+            }
+            
+            lastDetectionTime = now;
+            
+            const canvas = document.createElement('canvas');
+            canvas.width = signupVideo.videoWidth;
+            canvas.height = signupVideo.videoHeight;
+            canvas.getContext('2d').drawImage(signupVideo, 0, 0);
+            const imageData = canvas.toDataURL('image/jpeg', 0.8);
+            
+            try {
+                const response = await fetch('/detect_face', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({image: imageData})
+                });
+                
+                const result = await response.json();
+                return result;
+            } catch (error) {
+                console.error('Face detection API error:', error);
+                return null;
+            }
+        }
+        
+        function startSignupCamera() {
+            navigator.mediaDevices.getUserMedia({ 
+                video: { 
+                    width: { ideal: 640 },
+                    height: { ideal: 480 },
+                    facingMode: 'user'
+                } 
+            })
+            .then(stream => {
+                signupStream = stream;
+                signupVideo.srcObject = stream;
+                signupVideo.onloadedmetadata = () => {
+                    signupStatus.textContent = 'Position your face in the frame';
+                    signupStatus.className = 'status-warning';
+                    startSignupFaceDetection();
+                };
+            })
+            .catch(err => {
+                signupStatus.textContent = 'Camera access denied: ' + err.message;
+                signupStatus.className = 'status-error';
+            });
+        }
+        
+        function stopSignupCamera() {
+            if (signupStream) {
+                signupStream.getTracks().forEach(track => track.stop());
+                signupStream = null;
+            }
+            isProcessing = false;
+        }
+        
+        async function startSignupFaceDetection() {
+            const detectFaces = async () => {
+                if (isProcessing || hasCaptured) {
+                    requestAnimationFrame(detectFaces);
+                    return;
+                }
+                
+                const result = await detectFaceWithAPI();
+                
+                if (result && result.face_detected && !isProcessing && !hasCaptured) {
+                    qualityBar.style.display = 'block';
+                    qualityFill.style.width = `${result.quality * 100}%`;
+                    
+                    faceGuide.classList.add('face-detected');
+                    faceGuideLabel.textContent = '✅ Face detected! Capturing...';
+                    signupStatus.textContent = `Face detected! Capturing...`;
+                    signupStatus.className = 'status-success';
+                    
+                    captureImmediately();
+                } else if (result && !result.face_detected) {
+                    faceGuide.classList.remove('face-detected');
+                    faceGuideLabel.textContent = 'Position face here';
+                    signupStatus.textContent = 'Position your face in the frame';
+                    signupStatus.className = 'status-warning';
+                    qualityBar.style.display = 'none';
+                }
+                
+                requestAnimationFrame(detectFaces);
+            };
+            detectFaces();
+        }
+        
+        function captureImmediately() {
+            if (isProcessing || hasCaptured) return;
+            
+            isProcessing = true;
+            hasCaptured = true;
+            
+            // Flash effect
+            signupVideo.classList.add('flash-message');
+            setTimeout(() => signupVideo.classList.remove('flash-message'), 200);
+            
+            // Capture image
+            signupCanvas.width = signupVideo.videoWidth;
+            signupCanvas.height = signupVideo.videoHeight;
+            signupCanvas.getContext('2d').drawImage(signupVideo, 0, 0);
+            const imageData = signupCanvas.toDataURL('image/jpeg', 0.9);
+            faceImageInput.value = imageData;
+            signupSnapshot.src = imageData;
+            signupSnapshot.style.display = 'block';
+            
+            // Stop camera
+            stopSignupCamera();
+            
+            // Show recapture button
+            recaptureBtn.style.display = 'block';
+            
+            signupStatus.textContent = '✅ Face captured successfully!';
+            signupStatus.className = 'status-success';
+            
+            // Submit form automatically after capture
+            setTimeout(() => {
+                signupForm.submit();
+            }, 1000);
+        }
+        
+        function restartCamera() {
+            // Reset capture state
+            hasCaptured = false;
+            isProcessing = false;
+            faceImageInput.value = '';
+            signupSnapshot.style.display = 'none';
+            recaptureBtn.style.display = 'none';
+            
+            // Restart camera
+            startSignupCamera();
+        }
+        
+        // Cleanup on page unload
+        window.addEventListener('beforeunload', function() {
+            if (signupStream) {
+                signupStream.getTracks().forEach(track => track.stop());
+            }
+        });
+        
+        // Initial hint update
+        updateHint();
+    </script>
 </body>
 </html>

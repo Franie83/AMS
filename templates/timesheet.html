@@ -1,53 +1,603 @@
 {% extends "layout.html" %}
 {% block body %}
-<h3>Timesheet</h3>
+<div class="container-fluid px-4">
+    <h3 class="mb-4">📊 Timesheet Management</h3>
 
-<form method="get" class="row g-2 mb-3">
-  <div class="col"><input name="name" class="form-control" placeholder="Name" value="{{ request.args.get('name','') }}"></div>
-  <div class="col"><input name="mda" class="form-control" placeholder="MDA" value="{{ request.args.get('mda','') }}"></div>
-  <div class="col"><input name="employeeid" class="form-control" placeholder="Employee ID" value="{{ request.args.get('employeeid','') }}"></div>
-  <div class="col"><input name="date_from" class="form-control" type="date" value="{{ request.args.get('date_from','') }}"></div>
-  <div class="col"><input name="date_to" class="form-control" type="date" value="{{ request.args.get('date_to','') }}"></div>
-  <div class="col-auto"><button class="btn btn-outline-primary">Filter</button></div>
-</form>
+    <!-- Summary Cards -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card bg-primary text-white">
+                <div class="card-body">
+                    <h5 class="card-title">Total Records</h5>
+                    <h2>{{ times|length }}</h2>
+                    <small>Today's records</small>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-success text-white">
+                <div class="card-body">
+                    <h5 class="card-title">Avg. Confidence</h5>
+                    <h2>
+                        {% set total_conf = namespace(value=0) %}
+                        {% set count = namespace(value=0) %}
+                        {% for t in times %}
+                            {% if t.signin_confidence %}
+                                {% set total_conf.value = total_conf.value + t.signin_confidence %}
+                                {% set count.value = count.value + 1 %}
+                            {% endif %}
+                        {% endfor %}
+                        {{ (total_conf.value/count.value*100)|round if count.value > 0 else 0 }}%
+                    </h2>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-warning text-dark">
+                <div class="card-body">
+                    <h5 class="card-title">Currently In Office</h5>
+                    <h2>
+                        {% set office_count = namespace(value=0) %}
+                        {% for t in times %}
+                            {% if t.time_in and not t.time_out %}
+                                {% set office_count.value = office_count.value + 1 %}
+                            {% endif %}
+                        {% endfor %}
+                        {{ office_count.value }}
+                    </h2>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-info text-white">
+                <div class="card-body">
+                    <h5 class="card-title">Viewing Mode</h5>
+                    <h2>
+                        {% if request.args.get('date_from') or request.args.get('date_to') or request.args.get('name') or request.args.get('mda') or request.args.get('employeeid') %}
+                            <span class="badge bg-warning text-dark fs-6">Filtered</span>
+                        {% else %}
+                            <span class="badge bg-success fs-6">Today Only</span>
+                        {% endif %}
+                    </h2>
+                    <small>
+                        {% if request.args.get('date_from') or request.args.get('date_to') %}
+                            {{ request.args.get('date_from', 'Start') }} to {{ request.args.get('date_to', 'End') }}
+                        {% else %}
+                            {{ now.now().strftime('%Y-%m-%d') }}
+                        {% endif %}
+                    </small>
+                </div>
+            </div>
+        </div>
+    </div>
 
-<div class="mb-2">
-  <a class="btn btn-success" href="{{ url_for('export_excel') }}">Export Excel</a>
-  <a class="btn btn-secondary" href="{{ url_for('export_pdf') }}">Export PDF</a>
-  <a class="btn btn-warning" href="{{ url_for('mismatch') }}">Find Mismatches</a>
+    <!-- Quick View Tabs -->
+    <div class="mb-3">
+        <div class="btn-group" role="group">
+            <a href="{{ url_for('timesheet') }}" class="btn {% if not request.args.get('date_from') and not request.args.get('date_to') %}btn-primary{% else %}btn-outline-primary{% endif %}">
+                <i class="fas fa-calendar-day me-2"></i>Today
+            </a>
+            <a href="{{ url_for('timesheet') }}?date_from={{ now.now().replace(day=1).strftime('%Y-%m-%d') }}&date_to={{ now.now().strftime('%Y-%m-%d') }}" class="btn btn-outline-primary">
+                <i class="fas fa-calendar-week me-2"></i>This Month
+            </a>
+            <a href="{{ url_for('timesheet') }}?date_from={{ now.now().replace(month=1, day=1).strftime('%Y-%m-%d') }}&date_to={{ now.now().strftime('%Y-%m-%d') }}" class="btn btn-outline-primary">
+                <i class="fas fa-calendar-alt me-2"></i>This Year
+            </a>
+            <a href="{{ url_for('timesheet_history') }}" class="btn btn-outline-info">
+                <i class="fas fa-history me-2"></i>Full History
+            </a>
+        </div>
+    </div>
+
+    <!-- Advanced Filter Form -->
+    <div class="card mb-4">
+        <div class="card-header bg-light d-flex justify-content-between align-items-center">
+            <h5 class="mb-0">🔍 Filter Records</h5>
+            <span class="badge bg-info">Viewing: {% if request.args.get('date_from') or request.args.get('date_to') %}Custom Range{% else %}Today's Data{% endif %}</span>
+        </div>
+        <div class="card-body">
+            <form method="get" class="row g-3">
+                <div class="col-md-3">
+                    <label class="form-label">Employee Name</label>
+                    <input name="name" class="form-control" placeholder="Name" value="{{ request.args.get('name','') }}">
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">MDA</label>
+                    <input name="mda" class="form-control" placeholder="MDA" value="{{ request.args.get('mda','') }}">
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">Employee ID</label>
+                    <input name="employeeid" class="form-control" placeholder="ID" value="{{ request.args.get('employeeid','') }}">
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">From Date</label>
+                    <input name="date_from" class="form-control" type="date" value="{{ request.args.get('date_from','') }}">
+                </div>
+                <div class="col-md-2">
+                    <label class="form-label">To Date</label>
+                    <input name="date_to" class="form-control" type="date" value="{{ request.args.get('date_to','') }}">
+                </div>
+                <div class="col-md-1">
+                    <label class="form-label">&nbsp;</label>
+                    <button class="btn btn-primary w-100">Filter</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Action Buttons -->
+    <div class="mb-3 d-flex gap-2 flex-wrap">
+        <div class="btn-group">
+            <a class="btn btn-success" href="{{ url_for('export_excel') }}?{{ request.query_string.decode() }}">
+                <i class="fas fa-file-excel"></i> Export Excel
+            </a>
+            <a class="btn btn-secondary" href="{{ url_for('export_pdf') }}?{{ request.query_string.decode() }}">
+                <i class="fas fa-file-pdf"></i> Export PDF
+            </a>
+        </div>
+        <a class="btn btn-warning" href="{{ url_for('mismatch') }}">
+            <i class="fas fa-exclamation-triangle"></i> Find Mismatches
+        </a>
+        <a class="btn btn-info" href="{{ url_for('timesheet') }}?date_from={{ now.now().strftime('%Y-%m-%d') }}&date_to={{ now.now().strftime('%Y-%m-%d') }}">
+            <i class="fas fa-calendar-day"></i> Today Only
+        </a>
+        <button class="btn btn-outline-secondary" onclick="$('.collapse').collapse('toggle')">
+            <i class="fas fa-eye"></i> Toggle Details
+        </button>
+    </div>
+
+    <!-- Timesheet Table -->
+    <div class="table-responsive">
+        <table class="table table-hover table-bordered" id="timesheetTable">
+            <thead class="table-dark">
+                <tr>
+                    <th>ID</th>
+                    <th>Name</th>
+                    <th>MDA</th>
+                    <th>Date</th>
+                    <th>Time In</th>
+                    <th>Time Out</th>
+                    <th>Duration</th>
+                    <th>Sign In Confidence</th>
+                    <th>Sign Out Confidence</th>
+                    <th>Face Quality</th>
+                    <th>Liveness</th>
+                    <th>Images</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for t in times %}
+                <tr class="timesheet-row" data-id="{{ t.id }}" style="cursor: pointer;">
+                    <td><strong>{{ t.id }}</strong></td>
+                    <td>
+                        {{ t.employee_name }}
+                        <br><small class="text-muted">ID: {{ t.employee_id }}</small>
+                    </td>
+                    <td>{{ t.mda or 'N/A' }}</td>
+                    <td>{{ t.date.strftime('%Y-%m-%d') if t.date else 'N/A' }}</td>
+                    <td>
+                        {{ t.time_in.strftime('%H:%M:%S') if t.time_in else '-' }}
+                        {% if t.time_in and t.time_in > time(8,30) %}
+                            <span class="badge bg-warning">Late</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {{ t.time_out.strftime('%H:%M:%S') if t.time_out else '-' }}
+                        {% if t.time_out and t.time_out < time(15,30) %}
+                            <span class="badge bg-warning">Early</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if t.time_in and t.time_out %}
+                            {% set time_in = t.time_in %}
+                            {% set time_out = t.time_out %}
+                            {% set duration_seconds = (time_out.hour * 3600 + time_out.minute * 60 + time_out.second) - (time_in.hour * 3600 + time_in.minute * 60 + time_in.second) %}
+                            {% if duration_seconds > 0 %}
+                                {{ duration_seconds // 3600 }}h {{ (duration_seconds // 60) % 60 }}m
+                            {% else %}
+                                -
+                            {% endif %}
+                        {% else %}
+                            -
+                        {% endif %}
+                    </td>
+                    <td class="text-center" style="min-width: 100px;">
+                        {% if t.signin_confidence is defined and t.signin_confidence > 0 %}
+                            <div class="progress" style="height: 20px;">
+                                <div class="progress-bar {% if t.signin_confidence > 0.7 %}bg-success
+                                    {% elif t.signin_confidence > 0.4 %}bg-warning
+                                    {% else %}bg-danger{% endif %}" 
+                                    style="width: {{ t.signin_confidence * 100 }}%"
+                                    role="progressbar">
+                                    {{ (t.signin_confidence * 100)|round }}%
+                                </div>
+                            </div>
+                            <small class="text-muted">Match: {{ '✅' if t.reg_signin_match else '❌' }}</small>
+                        {% else %}
+                            <span class="badge bg-secondary">No data</span>
+                        {% endif %}
+                    </td>
+                    <td class="text-center" style="min-width: 100px;">
+                        {% if t.signout_confidence is defined and t.signout_confidence > 0 %}
+                            <div class="progress" style="height: 20px;">
+                                <div class="progress-bar {% if t.signout_confidence > 0.7 %}bg-success
+                                    {% elif t.signout_confidence > 0.4 %}bg-warning
+                                    {% else %}bg-danger{% endif %}" 
+                                    style="width: {{ t.signout_confidence * 100 }}%">
+                                    {{ (t.signout_confidence * 100)|round }}%
+                                </div>
+                            </div>
+                            <small class="text-muted">Match: {{ '✅' if t.reg_signout_match else '❌' }}</small>
+                        {% else %}
+                            <span class="badge bg-secondary">No data</span>
+                        {% endif %}
+                    </td>
+                    <td class="text-center">
+                        {% if t.signin_face_quality is defined %}
+                            <span class="badge {% if t.signin_face_quality > 0.7 %}bg-success
+                                {% elif t.signin_face_quality > 0.4 %}bg-warning
+                                {% else %}bg-danger{% endif %}">
+                                {{ (t.signin_face_quality * 100)|round }}%
+                            </span>
+                        {% else %}
+                            <span class="badge bg-secondary">N/A</span>
+                        {% endif %}
+                    </td>
+                    <td class="text-center">
+                        {% if t.signin_liveness_passed is defined %}
+                            {% if t.signin_liveness_passed %}
+                                <span class="badge bg-success">✅ Live</span>
+                            {% else %}
+                                <span class="badge bg-danger">❌</span>
+                            {% endif %}
+                        {% else %}
+                            <span class="badge bg-secondary">N/A</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <div class="d-flex gap-1">
+                            {% if t.registered_image %}
+                            <img src="{{ url_for('uploads', filename=t.registered_image.split('/')[-1]) }}" 
+                                 height="35" class="rounded border" title="Registered" 
+                                 onclick="showImage(this.src); event.stopPropagation();" style="cursor: pointer;">
+                            {% endif %}
+                            {% if t.signin_image %}
+                            <img src="{{ url_for('uploads', filename=t.signin_image.split('/')[-1]) }}" 
+                                 height="35" class="rounded border" title="Sign In"
+                                 onclick="showImage(this.src); event.stopPropagation();" style="cursor: pointer;">
+                            {% endif %}
+                            {% if t.signout_image %}
+                            <img src="{{ url_for('uploads', filename=t.signout_image.split('/')[-1]) }}" 
+                                 height="35" class="rounded border" title="Sign Out"
+                                 onclick="showImage(this.src); event.stopPropagation();" style="cursor: pointer;">
+                            {% endif %}
+                        </div>
+                    </td>
+                    <td>
+                        {% if t.reg_signin_match == false %}
+                            <span class="badge bg-danger">Sign In Mismatch</span>
+                        {% elif t.reg_signout_match == false %}
+                            <span class="badge bg-danger">Sign Out Mismatch</span>
+                        {% elif t.signin_confidence and t.signin_confidence < 0.6 %}
+                            <span class="badge bg-warning">Low Confidence</span>
+                        {% elif t.signin_liveness_passed == false %}
+                            <span class="badge bg-warning">Liveness Failed</span>
+                        {% elif t.time_in and not t.time_out %}
+                            <span class="badge bg-info">In Office</span>
+                        {% else %}
+                            <span class="badge bg-success">Complete</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <div class="btn-group-vertical btn-group-sm" onclick="event.stopPropagation();">
+                            <a class="btn btn-primary" href="{{ url_for('edit_timesheet_entry', id=t.id) }}">
+                                <i class="fas fa-edit"></i> Edit
+                            </a>
+                            <button class="btn btn-danger" onclick="del({{ t.id }})">
+                                <i class="fas fa-trash"></i> Delete
+                            </button>
+                        </div>
+                    </td>
+                </tr>
+            {% else %}
+                <tr>
+                    <td colspan="14" class="text-center py-5">
+                        <div class="display-1 text-muted mb-3">📭</div>
+                        <h4>No timesheet records found</h4>
+                        <p class="text-muted">
+                            {% if request.args.get('date_from') or request.args.get('date_to') %}
+                                No records found for the selected date range.
+                                <br><a href="{{ url_for('timesheet') }}" class="btn btn-sm btn-primary mt-2">View Today's Records</a>
+                            {% else %}
+                                No attendance records for today.
+                                <br><a href="{{ url_for('take_attendance') }}" class="btn btn-sm btn-success mt-2">Take Attendance</a>
+                                <a href="{{ url_for('timesheet_history') }}" class="btn btn-sm btn-info mt-2">View History</a>
+                            {% endif %}
+                        </p>
+                    </td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Table Footer with Summary -->
+    {% if times %}
+    <div class="card mt-3">
+        <div class="card-body">
+            <div class="row">
+                <div class="col-md-3">
+                    <strong>Total Records:</strong> {{ times|length }}
+                </div>
+                <div class="col-md-3">
+                    <strong>Currently in Office:</strong>
+                    {% set office_count = namespace(value=0) %}
+                    {% for t in times %}
+                        {% if t.time_in and not t.time_out %}
+                            {% set office_count.value = office_count.value + 1 %}
+                        {% endif %}
+                    {% endfor %}
+                    {{ office_count.value }}
+                </div>
+                <div class="col-md-3">
+                    <strong>Date Range:</strong>
+                    {% if request.args.get('date_from') or request.args.get('date_to') %}
+                        {{ request.args.get('date_from', 'Start') }} to {{ request.args.get('date_to', 'End') }}
+                    {% else %}
+                        {{ now.now().strftime('%Y-%m-%d') }} (Today)
+                    {% endif %}
+                </div>
+                <div class="col-md-3">
+                    <strong>Mismatches:</strong>
+                    {% set mismatch_count = namespace(value=0) %}
+                    {% for t in times %}
+                        {% if t.reg_signin_match == false or t.reg_signout_match == false %}
+                            {% set mismatch_count.value = mismatch_count.value + 1 %}
+                        {% endif %}
+                    {% endfor %}
+                    <span class="badge bg-danger">{{ mismatch_count.value }}</span>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
 </div>
 
-<table class="table table-sm table-bordered">
-  <thead><tr><th>Name</th><th>MDA</th><th>Date</th><th>Time In</th><th>Time Out</th><th>Images</th><th>Action</th></tr></thead>
-  <tbody>
-  {% for t in times %}
-    <tr>
-      <td>{{ t.employee_name }}</td>
-      <td>{{ t.mda }}</td>
-      <td>{{ t.date }}</td>
-      <td>{{ t.time_in or '' }}</td>
-      <td>{{ t.time_out or '' }}</td>
-      <td>
-        {% if t.registered_image %}<img height="40" src="{{ url_for('uploads', filename=t.registered_image.split('/')[-1]) }}">{% endif %}
-        {% if t.signin_image %}<img height="40" src="{{ url_for('uploads', filename=t.signin_image.split('/')[-1]) }}">{% endif %}
-        {% if t.signout_image %}<img height="40" src="{{ url_for('uploads', filename=t.signout_image.split('/')[-1]) }}">{% endif %}
-      </td>
-      <td>
-        <a class="btn btn-sm btn-primary" href="{{ url_for('edit_timesheet', id=t.id) }}">Edit</a>
-        <button class="btn btn-sm btn-danger" onclick="del({{ t.id }})">Delete</button>
-      </td>
-    </tr>
-  {% endfor %}
-  </tbody>
-</table>
+<!-- Receipt Modal -->
+<div class="modal fade" id="receiptModal" tabindex="-1" aria-labelledby="receiptModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title" id="receiptModalLabel">
+                    <i class="fas fa-receipt me-2"></i>ATTENDANCE DETAILS
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body" id="receiptContent">
+                <div class="text-center mb-4">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                    <p>Loading details...</p>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <div class="btn-group w-100" role="group">
+                    <button class="btn btn-success" onclick="shareReceipt('whatsapp')">
+                        <i class="fab fa-whatsapp me-2"></i>WhatsApp
+                    </button>
+                    <button class="btn btn-info" onclick="shareReceipt('telegram')">
+                        <i class="fab fa-telegram me-2"></i>Telegram
+                    </button>
+                    <button class="btn btn-primary" onclick="shareReceipt('facebook')">
+                        <i class="fab fa-facebook me-2"></i>Facebook
+                    </button>
+                    <button class="btn btn-secondary" onclick="shareReceipt('copy')">
+                        <i class="fas fa-copy me-2"></i>Copy
+                    </button>
+                </div>
+                <button type="button" class="btn btn-secondary w-100 mt-2" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Image Modal -->
+<div class="modal fade" id="imageModal" tabindex="-1">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Face Image</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body text-center">
+                <img id="modalImage" src="" class="img-fluid rounded">
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Add Font Awesome if not already in layout -->
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+<!-- html2pdf library -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 
 <script>
-async function del(id){
-  if (!confirm('Delete?')) return;
-  const res = await fetch('/timesheet/delete/'+id, {method:'POST'});
-  const j = await res.json();
-  if (j.status==='ok') location.reload();
-  else alert(j.msg || 'error');
+let imageModal;
+let currentReceiptData = null;
+let currentReceiptElement = null;
+
+document.addEventListener('DOMContentLoaded', function() {
+    imageModal = new bootstrap.Modal(document.getElementById('imageModal'));
+    
+    // Make rows clickable
+    document.querySelectorAll('.timesheet-row').forEach(row => {
+        row.addEventListener('click', function(e) {
+            if (e.target.tagName === 'BUTTON' || 
+                e.target.tagName === 'A' || 
+                e.target.tagName === 'I' ||
+                e.target.closest('.btn-group') ||
+                e.target.closest('button') ||
+                e.target.tagName === 'IMG') {
+                return;
+            }
+            const id = this.dataset.id;
+            showReceipt(id);
+        });
+    });
+});
+
+function showImage(src) {
+    document.getElementById('modalImage').src = src;
+    imageModal.show();
 }
+
+async function showReceipt(id) {
+    const modal = new bootstrap.Modal(document.getElementById('receiptModal'));
+    const content = document.getElementById('receiptContent');
+    
+    content.innerHTML = `
+        <div class="text-center mb-4">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+            <p>Loading details...</p>
+        </div>
+    `;
+    
+    modal.show();
+    
+    try {
+        const row = document.querySelector(`.timesheet-row[data-id="${id}"]`);
+        if (!row) throw new Error('Record not found');
+        
+        const cells = row.cells;
+        
+        const regImg = cells[11].querySelector('img[title="Registered"]');
+        const signinImg = cells[11].querySelector('img[title="Sign In"]');
+        const signoutImg = cells[11].querySelector('img[title="Sign Out"]');
+        
+        const signinConfText = cells[7].innerText.match(/([\d.]+)%/)?.[1] || '0';
+        const signoutConfText = cells[8].innerText.match(/([\d.]+)%/)?.[1] || '0';
+        
+        const data = {
+            id: id,
+            employee_name: cells[1].innerText.split('ID:')[0].trim(),
+            employee_id: cells[1].innerText.match(/ID: (\d+)/)?.[1] || 'N/A',
+            mda: cells[2].innerText,
+            date: cells[3].innerText,
+            time_in: cells[4].innerText.split(' ')[0],
+            time_out: cells[5].innerText.split(' ')[0] || 'Not signed out',
+            duration: cells[6].innerText,
+            signin_confidence: signinConfText,
+            signout_confidence: signoutConfText,
+            face_quality: cells[9].innerText.trim(),
+            liveness: cells[10].innerText.trim(),
+            status: cells[12].innerText.trim(),
+            reg_photo: regImg ? regImg.src : null,
+            signin_photo: signinImg ? signinImg.src : null,
+            signout_photo: signoutImg ? signoutImg.src : null
+        };
+        
+        currentReceiptData = data;
+        
+        const receiptHTML = generateReceiptHTML(data);
+        content.innerHTML = receiptHTML;
+        currentReceiptElement = content.querySelector('.receipt-container');
+        
+    } catch (error) {
+        content.innerHTML = `
+            <div class="alert alert-danger">
+                <i class="fas fa-exclamation-triangle me-2"></i>
+                Error loading details: ${error.message}
+            </div>
+        `;
+    }
+}
+
+function generateReceiptHTML(data) {
+    return `
+        <div class="receipt-container" style="font-family: 'Courier New', monospace; background: white; padding: 20px; border-radius: 10px; max-width: 100%;">
+            <div class="text-center mb-4">
+                <h4 style="color: #0d6efd; margin: 0;">🏢 ATTENDANCE DETAILS</h4>
+                <div style="border-bottom: 2px dashed #0d6efd; margin: 10px 0;"></div>
+                <small style="color: #6c757d;">Record #: ${data.id} | ${data.date}</small>
+            </div>
+            
+            <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; margin-bottom: 15px;">
+                <table style="width: 100%; border-collapse: collapse;">
+                    <tr><td style="padding: 6px; font-weight: bold; width: 100px;">Employee:</td><td style="padding: 6px;">${data.employee_name}</td></tr>
+                    <tr><td style="padding: 6px; font-weight: bold;">ID:</td><td style="padding: 6px;">${data.employee_id}</td></tr>
+                    <tr><td style="padding: 6px; font-weight: bold;">MDA:</td><td style="padding: 6px;">${data.mda}</td></tr>
+                </table>
+            </div>
+            
+            <div style="background: white; padding: 15px; border-radius: 8px; margin-bottom: 15px; border: 1px solid #dee2e6;">
+                <div style="display: flex; text-align: center;">
+                    <div style="flex: 1;"><strong>⏰ Time In</strong><br><span style="font-size: 1.1rem;">${data.time_in}</span></div>
+                    <div style="flex: 1;"><strong>⌛ Duration</strong><br><span style="font-size: 1.1rem;">${data.duration}</span></div>
+                    <div style="flex: 1;"><strong>🏁 Time Out</strong><br><span style="font-size: 1.1rem;">${data.time_out}</span></div>
+                </div>
+            </div>
+            
+            <div style="text-align: center; margin-top: 4px;">
+                <a href="{{ url_for('timesheet') }}" class="btn btn-sm btn-outline-primary">Back to Today</a>
+            </div>
+        </div>
+    `;
+}
+
+async function del(id) {
+    if (!confirm('Are you sure you want to delete this record?')) return;
+    
+    const btn = event.target;
+    btn.disabled = true;
+    btn.innerHTML = '⏳ Deleting...';
+    
+    try {
+        const res = await fetch('/timesheet/delete/' + id, { method: 'POST' });
+        const j = await res.json();
+        
+        if (j.status === 'ok') {
+            const row = btn.closest('tr');
+            row.style.transition = 'opacity 0.3s';
+            row.style.opacity = '0';
+            setTimeout(() => location.reload(), 300);
+        } else {
+            alert(j.msg || 'Error occurred');
+            btn.disabled = false;
+            btn.innerHTML = 'Delete';
+        }
+    } catch (err) {
+        alert('Network error');
+        btn.disabled = false;
+        btn.innerHTML = 'Delete';
+    }
+}
+
+document.addEventListener('keydown', (e) => {
+    if (e.ctrlKey && e.key === 'f') {
+        e.preventDefault();
+        document.querySelector('input[name="name"]').focus();
+    }
+});
 </script>
+
+<style>
+.table th { white-space: nowrap; cursor: pointer; }
+.table td { vertical-align: middle; }
+.timesheet-row:hover { background-color: rgba(0, 123, 255, 0.1) !important; transition: background-color 0.2s; }
+.progress { margin: 2px 0; border-radius: 10px; }
+.btn-group-vertical { gap: 2px; }
+.card { transition: transform 0.2s; }
+.card:hover { transform: translateY(-2px); box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
+.table-danger { border-left: 5px solid #dc3545; }
+.table-warning { border-left: 5px solid #ffc107; }
+img.rounded { transition: transform 0.2s; }
+img.rounded:hover { transform: scale(1.5); z-index: 1000; box-shadow: 0 4px 8px rgba(0,0,0,0.2); }
+.receipt-container { font-family: 'Courier New', monospace; }
+.modal-lg { max-width: 700px; }
+</style>
 {% endblock %}

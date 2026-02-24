@@ -1,0 +1,56 @@
+{% extends "layout.html" %}
+{% block body %}
+<div class="row justify-content-center">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header bg-primary text-white">
+                <h4 class="mb-0">✏️ Edit User: {{ user.name }}</h4>
+            </div>
+            <div class="card-body">
+                <form method="POST">
+                    <div class="mb-3">
+                        <label class="form-label">Full Name <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" name="name" value="{{ user.name }}" required>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Email <span class="text-danger">*</span></label>
+                        <input type="email" class="form-control" name="email" value="{{ user.email }}" required>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Phone Number <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" name="phone" value="{{ user.phone or '' }}" required>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">MDA <span class="text-danger">*</span></label>
+                        <input type="text" class="form-control" name="mda" value="{{ user.mda or '' }}" required>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Role <span class="text-danger">*</span></label>
+                        <select class="form-select" name="role" required>
+                            <option value="user" {% if user.role == 'user' %}selected{% endif %}>User</option>
+                            <option value="admin" {% if user.role == 'admin' %}selected{% endif %}>Admin</option>
+                        </select>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">New Password (leave blank to keep current)</label>
+                        <input type="password" class="form-control" name="password">
+                        <small class="text-muted">Enter only if you want to change the password</small>
+                    </div>
+                    
+                    <hr>
+                    
+                    <div class="d-flex gap-2">
+                        <button type="submit" class="btn btn-primary">💾 Save Changes</button>
+                        <a href="{{ url_for('admin_users') }}" class="btn btn-secondary">Cancel</a>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

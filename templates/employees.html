@@ -1,40 +1,540 @@
 {% extends "layout.html" %}
 {% block body %}
 <h3>Employees</h3>
-<form method="get" class="row g-2 mb-3">
-  <div class="col"><input name="name" class="form-control" placeholder="Name" value="{{ request.args.get('name','') }}"></div>
-  <div class="col"><input name="mda" class="form-control" placeholder="MDA" value="{{ request.args.get('mda','') }}"></div>
-  <div class="col"><input name="employeeid" class="form-control" placeholder="Employee ID" value="{{ request.args.get('employeeid','') }}"></div>
-  <div class="col-auto"><button class="btn btn-outline-primary">Filter</button></div>
-</form>
-<table class="table table-sm table-bordered">
-  <thead><tr><th>EmpID</th><th>Name</th><th>MDA</th><th>Phone</th><th>Role</th><th>Registered Image</th><th>Actions</th></tr></thead>
-  <tbody>
-    {% for e in employees %}
-    <tr>
-      <td>{{ e.employeeid }}</td>
-      <td>{{ e.name }}</td>
-      <td>{{ e.mda }}</td>
-      <td>{{ e.phone }}</td>
-      <td>{{ e.role }}</td>
-      <td>{% if e.registered_image %}<img src="{{ url_for('uploads', filename=e.registered_image) }}" height="50" alt="Employee Image">
-{% endif %}</td>
-      <td>
-        <a class="btn btn-sm btn-primary" href="{{ url_for('edit_employee', id=e.id) }}">Edit</a>
-        <button class="btn btn-sm btn-danger" onclick="deleteEmp({{ e.id }})">Delete</button>
-      </td>
-    </tr>
-    {% endfor %}
-  </tbody>
-</table>
+
+<div class="row mb-3">
+  <div class="col">
+    <form method="get" class="row g-2">
+      <div class="col-md-3">
+        <input name="name" class="form-control" placeholder="Name" value="{{ request.args.get('name','') }}">
+      </div>
+      <div class="col-md-2">
+        <input name="mda" class="form-control" placeholder="MDA" value="{{ request.args.get('mda','') }}">
+      </div>
+      <div class="col-md-2">
+        <input name="employeeid" class="form-control" placeholder="Employee ID" value="{{ request.args.get('employeeid','') }}">
+      </div>
+      <div class="col-md-2">
+        <input name="email" class="form-control" placeholder="Email" value="{{ request.args.get('email','') }}">
+      </div>
+      <div class="col-md-1">
+        <button class="btn btn-outline-primary w-100">Filter</button>
+      </div>
+      <div class="col-md-2">
+        {% if user_role == 'superadmin' %}
+        <a href="{{ url_for('register') }}" class="btn btn-success w-100">+ Add Employee</a>
+        {% endif %}
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="row mb-2">
+  <div class="col">
+    <strong>Total Employees:</strong> {{ employees|length }}
+    {% if user_role == 'admin' %}
+    <span class="badge bg-warning ms-2">View Only Mode</span>
+    {% elif user_role == 'superadmin' %}
+    <span class="badge bg-info ms-2">Super Admin - Full Access</span>
+    {% elif user_role == 'user' %}
+    <span class="badge bg-secondary ms-2">Limited Access</span>
+    {% endif %}
+  </div>
+</div>
+
+<div class="table-responsive">
+  <table class="table table-hover table-bordered" id="employeesTable">
+    <thead class="table-dark">
+      <tr>
+        <th>EmpID</th>
+        <th>Name</th>
+        <th>MDA</th>
+        <th>Email</th>
+        <th>Phone</th>
+        <th>Role</th>
+        <th>Registered Image</th>
+        <th>Face Quality</th>
+        <th>Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for e in employees %}
+      <tr class="employee-row" data-id="{{ e.id }}" data-employeeid="{{ e.employeeid }}" style="cursor: pointer;">
+        <td><strong>{{ e.employeeid }}</strong></td>
+        <td>{{ e.name }}</td>
+        <td>{{ e.mda or 'N/A' }}</td>
+        <td>{{ e.email or 'N/A' }}</td>
+        <td>{{ e.phone or 'N/A' }}</td>
+        <td>
+          {% if e.role == 'superadmin' %}
+            <span class="badge" style="background-color: #8e44ad;">Super Admin</span>
+          {% elif e.role == 'admin' %}
+            <span class="badge bg-danger">Admin</span>
+          {% else %}
+            <span class="badge bg-primary">User</span>
+          {% endif %}
+        </td>
+        <td class="text-center" onclick="event.stopPropagation();">
+          {% if e.registered_image %}
+            <img src="{{ url_for('uploads', filename=e.registered_image) }}" 
+                 height="50" width="50" style="object-fit: cover; border-radius: 5px;" 
+                 alt="Employee Image" class="border" onclick="showImage(this.src); event.stopPropagation();">
+          {% else %}
+            <span class="badge bg-secondary">No Image</span>
+          {% endif %}
+        </td>
+        <td class="text-center">
+          {% if e.registered_face_quality and e.registered_face_quality > 0 %}
+            <div class="progress" style="height: 20px; width: 80px;">
+              <div class="progress-bar {% if e.registered_face_quality > 0.7 %}bg-success
+                  {% elif e.registered_face_quality > 0.4 %}bg-warning
+                  {% else %}bg-danger{% endif %}" 
+                  style="width: {{ e.registered_face_quality * 100 }}%">
+                {{ (e.registered_face_quality * 100)|round }}%
+              </div>
+            </div>
+          {% else %}
+            <span class="badge bg-secondary">N/A</span>
+          {% endif %}
+        </td>
+        <td onclick="event.stopPropagation();">
+          <div class="btn-group btn-group-sm" role="group">
+            {% if user_role == 'superadmin' %}
+              <a class="btn btn-primary" href="{{ url_for('edit_employee', id=e.id) }}" title="Edit">
+                <i class="fas fa-edit"></i> Edit
+              </a>
+              <button class="btn btn-danger" onclick="deleteEmp({{ e.id }}, '{{ e.name }}')" title="Delete">
+                <i class="fas fa-trash"></i> Delete
+              </button>
+            {% elif user_role == 'admin' %}
+              <a class="btn btn-info" href="{{ url_for('edit_employee', id=e.id) }}" title="View">
+                <i class="fas fa-eye"></i> View
+              </a>
+              <button class="btn btn-secondary" disabled title="View only - Contact Super Admin">
+                <i class="fas fa-lock"></i> Locked
+              </button>
+            {% else %}
+              <button class="btn btn-secondary" disabled title="View only">
+                <i class="fas fa-eye"></i> View Only
+              </button>
+            {% endif %}
+          </div>
+        </td>
+      </tr>
+      {% else %}
+      <tr>
+        <td colspan="9" class="text-center py-4">
+          <div class="display-6 text-muted mb-3">👥</div>
+          <h5>No employees found</h5>
+          <p class="text-muted">
+            {% if user_role == 'superadmin' %}
+            Click "Add Employee" to register a new employee
+            {% else %}
+            No employees available in your MDA
+            {% endif %}
+          </p>
+          {% if user_role == 'superadmin' %}
+          <a href="{{ url_for('register') }}" class="btn btn-success">+ Add Employee</a>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<!-- Employee Receipt Modal -->
+<div class="modal fade" id="employeeReceiptModal" tabindex="-1" aria-labelledby="employeeReceiptModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title" id="employeeReceiptModalLabel">
+                    <i class="fas fa-id-card me-2"></i>EMPLOYEE DETAILS
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body" id="employeeReceiptContent">
+                <div class="text-center mb-4">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                    <p>Loading employee details...</p>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <div class="btn-group w-100" role="group">
+                    <button class="btn btn-success" onclick="downloadEmployeePDF()">
+                        <i class="fas fa-file-pdf me-2"></i>Download PDF
+                    </button>
+                    <button class="btn btn-info" onclick="shareEmployeePDF('whatsapp')">
+                        <i class="fab fa-whatsapp me-2"></i>WhatsApp
+                    </button>
+                    <button class="btn btn-primary" onclick="shareEmployeePDF('telegram')">
+                        <i class="fab fa-telegram me-2"></i>Telegram
+                    </button>
+                    <button class="btn btn-secondary" onclick="shareEmployeePDF('email')">
+                        <i class="fas fa-envelope me-2"></i>Email
+                    </button>
+                </div>
+                <button type="button" class="btn btn-secondary w-100 mt-2" data-bs-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Image Modal -->
+<div class="modal fade" id="imageModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Employee Photo</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body text-center">
+        <img id="modalImage" src="" class="img-fluid rounded" style="max-height: 400px;">
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- html2pdf library -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 
 <script>
-async function deleteEmp(id){
-  if (!confirm('Delete?')) return;
-  const res = await fetch('/employees/delete/'+id, {method:'POST'});
-  const j = await res.json();
-  if (j.status==='ok') location.reload();
-  else alert(j.msg || 'error');
+let imageModal;
+let currentEmployeeData = null;
+let currentReceiptElement = null;
+
+document.addEventListener('DOMContentLoaded', function() {
+  imageModal = new bootstrap.Modal(document.getElementById('imageModal'));
+  
+  // Make employee rows clickable
+  document.querySelectorAll('.employee-row').forEach(row => {
+    row.addEventListener('click', function(e) {
+      // Don't trigger if clicking on buttons or images
+      if (e.target.tagName === 'BUTTON' || 
+          e.target.tagName === 'A' || 
+          e.target.tagName === 'I' ||
+          e.target.closest('.btn-group') ||
+          e.target.closest('button') ||
+          e.target.tagName === 'IMG') {
+        return;
+      }
+      const id = this.dataset.id;
+      const employeeId = this.dataset.employeeid;
+      showEmployeeReceipt(id, employeeId);
+    });
+  });
+});
+
+function showImage(src) {
+  document.getElementById('modalImage').src = src;
+  imageModal.show();
+}
+
+async function showEmployeeReceipt(id, employeeId) {
+    const modal = new bootstrap.Modal(document.getElementById('employeeReceiptModal'));
+    const content = document.getElementById('employeeReceiptContent');
+    
+    // Show loading
+    content.innerHTML = `
+        <div class="text-center mb-4">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+            <p>Loading employee details...</p>
+        </div>
+    `;
+    
+    modal.show();
+    
+    try {
+        // Find the record from the table data
+        const row = document.querySelector(`.employee-row[data-id="${id}"]`);
+        if (!row) throw new Error('Employee not found');
+        
+        const cells = row.cells;
+        
+        // Get image source
+        const imgElement = cells[6].querySelector('img');
+        
+        // Extract face quality
+        const qualityElement = cells[7].querySelector('.progress-bar');
+        const qualityText = qualityElement ? qualityElement.innerText : 'N/A';
+        
+        // Get role badge text
+        const roleBadge = cells[5].querySelector('.badge');
+        const roleText = roleBadge ? roleBadge.innerText : cells[5].innerText.trim();
+        
+        // Get role color
+        let roleColor = '#0d6efd'; // default blue
+        if (roleText.includes('Super Admin')) roleColor = '#8e44ad';
+        else if (roleText.includes('Admin')) roleColor = '#dc3545';
+        
+        const data = {
+            id: id,
+            employeeid: employeeId,
+            name: cells[1].innerText,
+            mda: cells[2].innerText,
+            email: cells[3].innerText,
+            phone: cells[4].innerText,
+            role: roleText,
+            role_color: roleColor,
+            photo: imgElement ? imgElement.src : null,
+            face_quality: qualityText,
+            created_at: "{{ now().strftime('%Y-%m-%d') }}"
+        };
+        
+        currentEmployeeData = data;
+        
+        // Generate receipt HTML
+        const receiptHTML = generateEmployeeReceiptHTML(data);
+        content.innerHTML = receiptHTML;
+        
+        // Store reference to receipt element for PDF generation
+        currentReceiptElement = content.querySelector('.receipt-container');
+        
+    } catch (error) {
+        content.innerHTML = `
+            <div class="alert alert-danger">
+                <i class="fas fa-exclamation-triangle me-2"></i>
+                Error loading employee details: ${error.message}
+            </div>
+        `;
+    }
+}
+
+function generateEmployeeReceiptHTML(data) {
+    return `
+        <div class="receipt-container" style="font-family: 'Courier New', monospace; background: white; padding: 20px; border-radius: 10px; max-width: 100%;">
+            <!-- Header -->
+            <div class="text-center mb-4">
+                <h4 style="color: #0d6efd; margin: 0;">👤 EMPLOYEE IDENTITY CARD</h4>
+                <div style="border-bottom: 2px dashed #0d6efd; margin: 10px 0;"></div>
+                <small style="color: #6c757d;">Employee ID: ${data.employeeid}</small>
+            </div>
+            
+            <!-- Photo and Basic Info -->
+            <div style="display: flex; margin-bottom: 20px;">
+                <div style="width: 120px; text-align: center;">
+                    ${data.photo ? 
+                        `<img src="${data.photo}" style="width: 100px; height: 100px; object-fit: cover; border-radius: 10px; border: 3px solid #0d6efd;">` : 
+                        '<div style="width: 100px; height: 100px; background: #6c757d; color: white; border-radius: 10px; display: flex; align-items: center; justify-content: center;"><i class="fas fa-user fa-3x"></i></div>'}
+                </div>
+                <div style="flex: 1; margin-left: 20px;">
+                    <table style="width: 100%; border-collapse: collapse;">
+                        <tr>
+                            <td style="padding: 4px; font-weight: bold; width: 80px;">Name:</td>
+                            <td style="padding: 4px;">${data.name}</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 4px; font-weight: bold;">ID:</td>
+                            <td style="padding: 4px;"><strong>${data.employeeid}</strong></td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 4px; font-weight: bold;">MDA:</td>
+                            <td style="padding: 4px;">${data.mda}</td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+            
+            <!-- Contact Details -->
+            <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; margin-bottom: 15px;">
+                <h6 style="color: #0d6efd; margin: 0 0 10px 0;">📞 Contact Information</h6>
+                <table style="width: 100%; border-collapse: collapse;">
+                    <tr>
+                        <td style="padding: 6px; font-weight: bold; width: 80px;">Email:</td>
+                        <td style="padding: 6px;">${data.email}</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 6px; font-weight: bold;">Phone:</td>
+                        <td style="padding: 6px;">${data.phone}</td>
+                    </tr>
+                </table>
+            </div>
+            
+            <!-- Role and Quality -->
+            <div style="display: flex; gap: 10px; margin-bottom: 15px;">
+                <div style="flex: 1; background: #f8f9fa; padding: 15px; border-radius: 8px; text-align: center;">
+                    <strong>Role:</strong><br>
+                    <span style="display: inline-block; background-color: ${data.role_color}; color: white; padding: 5px 10px; border-radius: 20px; margin-top: 5px;">
+                        ${data.role}
+                    </span>
+                </div>
+                <div style="flex: 1; background: #f8f9fa; padding: 15px; border-radius: 8px; text-align: center;">
+                    <strong>Face Quality:</strong><br>
+                    <span style="display: inline-block; background-color: ${data.face_quality.includes('70') ? '#28a745' : data.face_quality.includes('40') ? '#ffc107' : '#6c757d'}; color: white; padding: 5px 10px; border-radius: 20px; margin-top: 5px;">
+                        ${data.face_quality}
+                    </span>
+                </div>
+            </div>
+            
+            <!-- Registration Date -->
+            <div style="background: #e9ecef; padding: 10px; border-radius: 8px; text-align: center; margin-bottom: 15px;">
+                <small style="color: #6c757d;">
+                    <i class="fas fa-calendar-alt"></i> Registered: ${data.created_at}
+                </small>
+            </div>
+            
+            <!-- Footer -->
+            <div style="text-align: center;">
+                <div style="border-top: 1px dashed #0d6efd; padding-top: 10px;">
+                    <small style="color: #6c757d;">
+                        Generated on ${new Date().toLocaleString()}<br>
+                        This is an official employee identification card.
+                    </small>
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+function downloadEmployeePDF() {
+    if (!currentReceiptElement) {
+        alert('No receipt to download');
+        return;
+    }
+    
+    const employeeName = currentEmployeeData ? currentEmployeeData.name : 'employee';
+    const filename = `${employeeName}_ID_Card.pdf`.replace(/\s+/g, '_');
+    
+    const opt = {
+        margin: [0.5, 0.5, 0.5, 0.5],
+        filename: filename,
+        image: { type: 'jpeg', quality: 0.98 },
+        html2canvas: { scale: 2, logging: false, letterRendering: true },
+        jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' }
+    };
+    
+    html2pdf().set(opt).from(currentReceiptElement).save();
+}
+
+function shareEmployeePDF(platform) {
+    if (!currentReceiptElement) {
+        alert('No receipt to share');
+        return;
+    }
+    
+    const employeeName = currentEmployeeData ? currentEmployeeData.name : 'employee';
+    const filename = `${employeeName}_ID_Card.pdf`.replace(/\s+/g, '_');
+    
+    // Generate PDF as blob
+    const opt = {
+        margin: [0.5, 0.5, 0.5, 0.5],
+        filename: filename,
+        image: { type: 'jpeg', quality: 0.98 },
+        html2canvas: { scale: 2, logging: false, letterRendering: true },
+        jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' }
+    };
+    
+    html2pdf().set(opt).from(currentReceiptElement).outputPdf().then((pdfBlob) => {
+        // Create a blob URL
+        const blob = new Blob([pdfBlob], { type: 'application/pdf' });
+        const url = URL.createObjectURL(blob);
+        
+        if (platform === 'whatsapp') {
+            // For WhatsApp, we can share a link to download
+            const shareText = `📄 Employee ID Card for ${currentEmployeeData.name}\nDownload PDF: ${window.location.origin}/download_temp?file=${filename}`;
+            window.open(`https://wa.me/?text=${encodeURIComponent(shareText)}`, '_blank');
+            
+            // You would need a server endpoint to serve the temp file
+            // For now, we'll just download and instruct user to share manually
+            alert('PDF generated. Please download and share via WhatsApp manually.');
+            downloadEmployeePDF();
+            
+        } else if (platform === 'telegram') {
+            const shareText = `📄 Employee ID Card for ${currentEmployeeData.name}\nDownload PDF: ${window.location.origin}/download_temp?file=${filename}`;
+            window.open(`https://t.me/share/url?url=${encodeURIComponent(shareText)}`, '_blank');
+            alert('PDF generated. Please download and share via Telegram manually.');
+            downloadEmployeePDF();
+            
+        } else if (platform === 'email') {
+            // Create mailto link with subject and body
+            const subject = `Employee ID Card: ${currentEmployeeData.name}`;
+            const body = `Please find attached the employee ID card for ${currentEmployeeData.name}.\n\nEmployee ID: ${currentEmployeeData.employeeid}\nMDA: ${currentEmployeeData.mda}`;
+            window.location.href = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+            alert('PDF generated. Please attach the downloaded PDF to your email.');
+            downloadEmployeePDF();
+        }
+    });
+}
+
+async function deleteEmp(id, name) {
+  if (!confirm(`Are you sure you want to delete employee ${name}?`)) return;
+  
+  const btn = event.target;
+  const originalText = btn.innerHTML;
+  btn.disabled = true;
+  btn.innerHTML = '⏳ Deleting...';
+  
+  try {
+    const res = await fetch('/employees/delete/' + id, { method: 'POST' });
+    const j = await res.json();
+    
+    if (j.status === 'ok') {
+      const row = btn.closest('tr');
+      row.style.transition = 'opacity 0.3s';
+      row.style.opacity = '0';
+      setTimeout(() => location.reload(), 300);
+    } else {
+      alert(j.msg || 'Error occurred');
+      btn.disabled = false;
+      btn.innerHTML = originalText;
+    }
+  } catch (err) {
+    alert('Network error');
+    btn.disabled = false;
+    btn.innerHTML = originalText;
+  }
 }
 </script>
+
+<style>
+.table th {
+  white-space: nowrap;
+}
+.table td {
+  vertical-align: middle;
+}
+.employee-row:hover {
+  background-color: rgba(13, 110, 253, 0.1) !important;
+  transition: background-color 0.2s;
+}
+.btn-group {
+  gap: 2px;
+}
+.progress {
+  margin: 0 auto;
+  border-radius: 10px;
+}
+img {
+  cursor: pointer;
+  transition: transform 0.2s;
+}
+img:hover {
+  transform: scale(1.5);
+  box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+  z-index: 1000;
+}
+.badge.bg-info {
+  font-size: 0.8rem;
+  padding: 0.3rem 0.6rem;
+}
+.badge.bg-warning {
+  font-size: 0.8rem;
+  padding: 0.3rem 0.6rem;
+}
+.receipt-container {
+  font-family: 'Courier New', monospace;
+  background: white;
+  max-width: 100%;
+}
+.receipt-container table td {
+  padding: 4px;
+}
+.modal-lg {
+  max-width: 700px;
+}
+</style>
 {% endblock %}

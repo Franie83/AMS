@@ -1,0 +1,228 @@
+{% extends "layout.html" %}
+{% block body %}
+<div class="row justify-content-center">
+    <div class="col-md-6">
+        <div class="card shadow-lg border-0">
+            <div class="card-header bg-success text-white py-3">
+                <h4 class="mb-0">
+                    <i class="fas fa-user-plus me-2"></i>Add New User
+                </h4>
+                <small class="text-white-50">Create a new system user account</small>
+            </div>
+            <div class="card-body p-4">
+                {% with messages = get_flashed_messages(with_categories=true) %}
+                    {% if messages %}
+                        {% for category, message in messages %}
+                            <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+                                {{ message }}
+                                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                            </div>
+                        {% endfor %}
+                    {% endif %}
+                {% endwith %}
+                
+                <form method="POST" id="addUserForm">
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">
+                            <i class="fas fa-user text-primary me-2"></i>Full Name <span class="text-danger">*</span>
+                        </label>
+                        <input type="text" class="form-control form-control-lg" name="name" placeholder="Enter full name" required>
+                        <div class="form-text">The user's full name as it should appear in the system</div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">
+                            <i class="fas fa-envelope text-primary me-2"></i>Email <span class="text-danger">*</span>
+                        </label>
+                        <input type="email" class="form-control form-control-lg" name="email" placeholder="user@example.com" required>
+                        <div class="form-text">Used for login and notifications</div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">
+                            <i class="fas fa-phone text-primary me-2"></i>Phone Number <span class="text-danger">*</span>
+                        </label>
+                        <input type="tel" class="form-control form-control-lg" name="phone" placeholder="Enter phone number" required>
+                        <div class="form-text">Contact number for the user</div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">
+                            <i class="fas fa-building text-primary me-2"></i>MDA <span class="text-danger">*</span>
+                        </label>
+                        <input type="text" class="form-control form-control-lg" name="mda" placeholder="Enter MDA (e.g., MCDE, MOE, etc.)" required>
+                        <div class="form-text">
+                            <i class="fas fa-info-circle text-info me-1"></i>
+                            Employees registered by this user will automatically get this MDA
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">
+                            <i class="fas fa-shield-alt text-primary me-2"></i>Role <span class="text-danger">*</span>
+                        </label>
+                        <select class="form-select form-select-lg" name="role" required>
+                            <option value="user" selected>👤 User (Standard access)</option>
+                            <option value="admin">👑 Admin (Full system access)</option>
+                        </select>
+                        <div class="form-text">
+                            <span class="badge bg-info me-1">User</span> Can register employees and take attendance<br>
+                            <span class="badge bg-danger me-1">Admin</span> Full access including user management
+                        </div>
+                    </div>
+                    
+                    <div class="mb-4">
+                        <label class="form-label fw-bold">
+                            <i class="fas fa-lock text-primary me-2"></i>Password <span class="text-danger">*</span>
+                        </label>
+                        <div class="input-group">
+                            <input type="password" class="form-control form-control-lg" id="password" name="password" placeholder="Create a strong password" required minlength="6">
+                            <button class="btn btn-outline-secondary" type="button" id="togglePassword">
+                                <i class="fas fa-eye"></i>
+                            </button>
+                        </div>
+                        <div class="form-text">
+                            <i class="fas fa-exclamation-triangle text-warning me-1"></i>
+                            Minimum 6 characters. Use a mix of letters, numbers, and symbols for better security.
+                        </div>
+                        <div class="password-strength mt-2" id="passwordStrength">
+                            <div class="progress" style="height: 5px;">
+                                <div class="progress-bar" role="progressbar" style="width: 0%;" id="strengthBar"></div>
+                            </div>
+                            <small class="text-muted" id="strengthText">Enter password</small>
+                        </div>
+                    </div>
+                    
+                    <hr class="my-4">
+                    
+                    <div class="d-flex gap-2">
+                        <button type="submit" class="btn btn-success btn-lg flex-grow-1">
+                            <i class="fas fa-check-circle me-2"></i>Create User
+                        </button>
+                        <a href="{{ url_for('admin_users') }}" class="btn btn-secondary btn-lg">
+                            <i class="fas fa-times-circle me-2"></i>Cancel
+                        </a>
+                    </div>
+                </form>
+            </div>
+            <div class="card-footer bg-light py-3">
+                <small class="text-muted">
+                    <i class="fas fa-info-circle me-1"></i>
+                    All fields are required. The user will be able to log in immediately after creation.
+                </small>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Password visibility toggle and strength checker -->
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Toggle password visibility
+    const togglePassword = document.getElementById('togglePassword');
+    const password = document.getElementById('password');
+    
+    togglePassword.addEventListener('click', function() {
+        const type = password.getAttribute('type') === 'password' ? 'text' : 'password';
+        password.setAttribute('type', type);
+        this.innerHTML = type === 'password' ? '<i class="fas fa-eye"></i>' : '<i class="fas fa-eye-slash"></i>';
+    });
+    
+    // Password strength checker
+    password.addEventListener('input', function() {
+        const strength = checkPasswordStrength(this.value);
+        updateStrengthIndicator(strength);
+    });
+    
+    function checkPasswordStrength(password) {
+        let strength = 0;
+        
+        if (password.length >= 6) strength += 20;
+        if (password.length >= 8) strength += 10;
+        if (password.match(/[a-z]+/)) strength += 20;
+        if (password.match(/[A-Z]+/)) strength += 20;
+        if (password.match(/[0-9]+/)) strength += 20;
+        if (password.match(/[$@#&!]+/)) strength += 10;
+        
+        return Math.min(strength, 100);
+    }
+    
+    function updateStrengthIndicator(strength) {
+        const bar = document.getElementById('strengthBar');
+        const text = document.getElementById('strengthText');
+        
+        bar.style.width = strength + '%';
+        
+        if (strength < 30) {
+            bar.className = 'progress-bar bg-danger';
+            text.innerHTML = 'Weak password';
+            text.className = 'text-danger';
+        } else if (strength < 60) {
+            bar.className = 'progress-bar bg-warning';
+            text.innerHTML = 'Medium password';
+            text.className = 'text-warning';
+        } else {
+            bar.className = 'progress-bar bg-success';
+            text.innerHTML = 'Strong password';
+            text.className = 'text-success';
+        }
+    }
+});
+</script>
+
+<style>
+.card {
+    border-radius: 15px;
+    overflow: hidden;
+}
+.card-header {
+    border-bottom: none;
+}
+.form-control-lg, .form-select-lg {
+    border-radius: 10px;
+    border: 2px solid #e1e5e9;
+    transition: all 0.3s ease;
+}
+.form-control-lg:focus, .form-select-lg:focus {
+    border-color: #28a745;
+    box-shadow: 0 0 0 3px rgba(40, 167, 69, 0.1);
+}
+.btn-lg {
+    border-radius: 10px;
+    padding: 12px;
+    font-weight: 600;
+}
+.btn-success {
+    background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+    border: none;
+}
+.btn-success:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 5px 15px rgba(40, 167, 69, 0.3);
+}
+.btn-secondary {
+    background: linear-gradient(135deg, #6c757d 0%, #5a6268 100%);
+    border: none;
+}
+.btn-secondary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 5px 15px rgba(108, 117, 125, 0.3);
+}
+.form-text {
+    font-size: 0.85rem;
+    margin-top: 5px;
+}
+.badge {
+    padding: 5px 10px;
+    font-weight: 500;
+}
+.input-group .btn-outline-secondary {
+    border: 2px solid #e1e5e9;
+    border-left: none;
+}
+.input-group .btn-outline-secondary:hover {
+    background-color: #f8f9fa;
+    border-color: #28a745;
+}
+</style>
+{% endblock %}
