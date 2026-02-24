@@ -42,4 +42,4 @@ Thumbs.db
 
 # Logs
 *.log
-logs/
+logs/"attendance.db.backup_*" 
