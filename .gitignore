@@ -43,3 +43,8 @@ Thumbs.db
 # Logs
 *.log
 logs/"attendance.db.backup_*" 
+"build/" 
+"dist/" 
+"*.spec" 
+"venv*/" 
+"*.db.backup*" 

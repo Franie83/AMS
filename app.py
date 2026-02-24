@@ -753,7 +753,136 @@ def take_attendance():
             })
     return render_template('take_attendance.html')
 
-
+# ------------------------------
+# Live Attendance (NEW - Matches face before signing in)
+# ------------------------------
+# ------------------------------
+# Live Attendance (NEW - Matches face before signing in/out)
+# ------------------------------
+@app.route('/live_attendance', methods=['GET','POST'])
+@login_required
+def live_attendance():
+    if request.method == 'POST':
+        empid = request.form.get('employeeid', '').strip()
+        b64 = request.form.get('captured_image')
+        
+        if not empid:
+            return jsonify({"status":"error","msg":"employeeid required"}), 400
+        emp = Employee.query.filter_by(employeeid=empid).first()
+        if not emp:
+            return jsonify({"status":"error","msg":"unknown employeeid"}), 404
+        if not b64:
+            return jsonify({"status":"error","msg":"no image"}), 400
+        
+        # Save captured image
+        img_path = save_base64_image(b64, prefix=f"live_{empid}")
+        if not img_path:
+            return jsonify({"status":"error","msg":"Failed to save image"}), 500
+            
+        captured_path = os.path.join(app.config['UPLOAD_FOLDER'], img_path)
+        
+        # Check if face is detected in captured image
+        face_detected, captured_encoding, _, face_quality = detect_and_encode_face(captured_path)
+        
+        if not face_detected:
+            os.remove(captured_path)
+            return jsonify({
+                "status":"error",
+                "msg":"No face detected. Please ensure your face is clearly visible."
+            }), 400
+        
+        # Check liveness
+        liveness_passed = check_liveness(captured_path)
+        
+        # Get registered image path and encoding
+        reg_path = None
+        reg_encoding = None
+        if emp.registered_image:
+            reg_path = os.path.join(app.config['UPLOAD_FOLDER'], emp.registered_image)
+            if os.path.exists(reg_path):
+                _, reg_encoding, _, _ = detect_and_encode_face(reg_path)
+        
+        # Verify face match
+        match = False
+        confidence = 0.0
+        
+        if reg_encoding is not None and captured_encoding is not None:
+            match, confidence = compare_faces(reg_encoding, captured_encoding)
+            match = bool(match)
+        
+        # Use 60% threshold (changed from 65%)
+        if not match or confidence < 0.60:
+            os.remove(captured_path)
+            return jsonify({
+                "status":"error",
+                "msg":f"Face does not match registered employee. Confidence: {round(confidence*100)}% (need 60%)"
+            }), 400
+        
+        # Face matches! Now check today's attendance
+        today = date.today()
+        ts = Timesheet.query.filter_by(employee_id=emp.id, date=today).order_by(Timesheet.id.desc()).first()
+        now_t = datetime.now().time()
+        
+        # Case 1: No record today → SIGN IN
+        if ts is None:
+            # SIGN IN
+            new = Timesheet(
+                employee_id=emp.id,
+                employee_name=emp.name,
+                mda=emp.mda,
+                registered_image=emp.registered_image,
+                signin_image=img_path,
+                date=today,
+                time_in=now_t,
+                reg_signin_match=match,
+                reg_signout_match=False,
+                signin_confidence=float(confidence),
+                signin_face_quality=float(face_quality),
+                signin_liveness_passed=bool(liveness_passed)
+            )
+            db.session.add(new)
+            db.session.commit()
+            
+            return jsonify({
+                "status":"ok", 
+                "action":"signed_in", 
+                "face_match": match,
+                "confidence": float(round(confidence * 100, 2)),
+                "face_quality": float(round(face_quality * 100, 2)),
+                "liveness_passed": bool(liveness_passed),
+                "message": f"✅ LIVE ATTENDANCE: {emp.name} verified and signed in! ({round(confidence*100)}% match)"
+            })
+        
+        # Case 2: Has sign-in but no sign-out → SIGN OUT
+        elif ts.time_in and not ts.time_out:
+            # SIGN OUT
+            ts.signout_image = img_path
+            ts.time_out = now_t
+            ts.reg_signout_match = match
+            ts.signout_confidence = float(confidence)
+            ts.signout_face_quality = float(face_quality)
+            ts.signout_liveness_passed = bool(liveness_passed)
+            db.session.commit()
+            
+            return jsonify({
+                "status":"ok", 
+                "action":"signed_out", 
+                "face_match": match,
+                "confidence": float(round(confidence * 100, 2)),
+                "face_quality": float(round(face_quality * 100, 2)),
+                "liveness_passed": bool(liveness_passed),
+                "message": f"✅ LIVE ATTENDANCE: {emp.name} verified and signed out! ({round(confidence*100)}% match)"
+            })
+        
+        # Case 3: Already completed both sign-in and sign-out today
+        else:
+            os.remove(captured_path)
+            return jsonify({
+                "status":"error",
+                "msg":"You have already completed attendance today (both signed in and out)."
+            }), 400
+    
+    return render_template('live_attendance.html')
 # ------------------------------
 # Employees list (with role-based permissions)
 # ------------------------------

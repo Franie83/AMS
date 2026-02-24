@@ -50,6 +50,16 @@
       background-color: #28a745;
       color: white;
     }
+    /* Live Attendance badge style */
+    .live-badge {
+      background-color: #dc3545;
+      color: white;
+      font-size: 0.6rem;
+      padding: 2px 6px;
+      border-radius: 10px;
+      margin-left: 5px;
+      vertical-align: middle;
+    }
   </style>
 </head>
 <body class="bg-light">
@@ -71,6 +81,15 @@
               <i class="fas fa-camera me-1"></i>Take Attendance
             </a>
           </li>
+          
+          <!-- NEW: Live Attendance Button -->
+          <li class="nav-item">
+            <a class="nav-link" href="{{ url_for('live_attendance') }}">
+              <i class="fas fa-video me-1"></i>Live Attendance
+              <span class="live-badge">NEW</span>
+            </a>
+          </li>
+          
           <li class="nav-item">
             <a class="nav-link" href="{{ url_for('register') }}">
               <i class="fas fa-user-plus me-1"></i>Register
