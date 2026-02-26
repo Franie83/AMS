@@ -7,7 +7,7 @@
                 <div class="card-header bg-danger text-white">
                     <h4 class="mb-0">
                         <i class="fas fa-exclamation-triangle me-2"></i>Face Mismatch Detection
-                        <span class="badge bg-light text-dark ms-2">Confidence Threshold: 65%</span>
+                        <span class="badge bg-light text-dark ms-2">Confidence Threshold: 55%</span>
                     </h4>
                 </div>
                 <div class="card-body">
@@ -41,7 +41,7 @@
                     <!-- Info Alert -->
                     <div class="alert alert-info mb-3">
                         <i class="fas fa-info-circle me-2"></i>
-                        <strong>Match Threshold: 65%</strong> — Confidence ≥65% = ✅ Match | Confidence {'<'}65% = ❌ Mismatch
+                        <strong>Match Threshold: 55%</strong> — Confidence ≥55% = ✅ Match | Confidence < 55% = ❌ Mismatch
                     </div>
                     
                     {% if mismatches and mismatches|length > 0 %}
@@ -64,10 +64,10 @@
                             </thead>
                             <tbody>
                                 {% for item in mismatches %}
-                                {% set is_signin_match = item.signin_confidence is defined and item.signin_confidence >= 0.65 %}
-                                {% set is_signout_match = item.signout_confidence is defined and item.signout_confidence >= 0.65 %}
-                                {% set is_signin_mismatch = item.signin_confidence is defined and item.signin_confidence < 0.65 %}
-                                {% set is_signout_mismatch = item.signout_confidence is defined and item.signout_confidence < 0.65 %}
+                                {% set is_signin_match = item.signin_confidence is defined and item.signin_confidence >= 0.55 %}
+                                {% set is_signout_match = item.signout_confidence is defined and item.signout_confidence >= 0.55 %}
+                                {% set is_signin_mismatch = item.signin_confidence is defined and item.signin_confidence < 0.55 %}
+                                {% set is_signout_mismatch = item.signout_confidence is defined and item.signout_confidence < 0.55 %}
                                 {% set has_mismatch = is_signin_mismatch or is_signout_mismatch %}
                                 <tr class="mismatch-row {% if has_mismatch %}table-danger{% endif %}" data-id="{{ item.id }}" style="cursor: pointer;">
                                     <td><strong>{{ item.id }}</strong></td>
@@ -136,7 +136,7 @@
                     <div class="text-center py-5">
                         <div class="display-1 text-success mb-4">✅</div>
                         <h3>No Face Mismatches Found!</h3>
-                        <p class="text-muted">All face recognition matches have confidence <strong>≥65%</strong>.</p>
+                        <p class="text-muted">All face recognition matches have confidence <strong>≥55%</strong>.</p>
                     </div>
                     {% endif %}
                 </div>
@@ -202,7 +202,7 @@
 <script>
 let imageModal;
 let currentReceiptData = null;
-const MATCH_THRESHOLD = 65; // 65% threshold
+const MATCH_THRESHOLD = 55; // 55% threshold
 
 document.addEventListener('DOMContentLoaded', function() {
     imageModal = new bootstrap.Modal(document.getElementById('imageModal'));
@@ -279,7 +279,6 @@ async function showReceipt(id) {
         const cells = row.cells;
         
         // Get image sources
-        const images = [];
         const regImg = cells[5].querySelector('img');
         const signinImg = cells[6].querySelector('img');
         const signoutImg = cells[7].querySelector('img');

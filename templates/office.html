@@ -179,7 +179,7 @@
 let imageModal;
 let currentOfficeData = null;
 let currentReceiptElement = null;
-const MATCH_THRESHOLD = 65; // 65% threshold
+const MATCH_THRESHOLD = 55; // 55% threshold - UPDATED FROM 65%
 
 document.addEventListener('DOMContentLoaded', function() {
     imageModal = new bootstrap.Modal(document.getElementById('imageModal'));
@@ -268,6 +268,7 @@ function generateOfficeReceiptHTML(data) {
                 <small style="color: #6c757d;">Record ID: ${data.id} | ${new Date().toLocaleDateString()}</small>
                 <div class="mt-2">
                     <span style="display: inline-block; background: #17a2b8; color: white; padding: 3px 8px; border-radius: 20px; font-size: 12px;">Currently In Office</span>
+                    <span style="display: inline-block; background: #6c757d; color: white; padding: 3px 8px; border-radius: 20px; font-size: 12px; margin-left: 5px;">Threshold: ${MATCH_THRESHOLD}%</span>
                 </div>
             </div>
             

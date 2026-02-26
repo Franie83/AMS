@@ -5,125 +5,177 @@
         <div class="card">
             <div class="card-body text-center">
                 <h2>🔴 Live Attendance</h2>
-                <p class="text-muted">Face must match registered employee before sign in/out</p>
-                <form id="attendanceForm">
-                    <div class="mb-3">
-                        <label class="form-label">Employee ID</label>
-                        <input type="text" class="form-control" id="attendanceEmpid" placeholder="Enter Employee ID (e.g., FKEE0001)" required autofocus>
-                        <div id="attendanceValidationMsg" class="mt-2"></div>
+                <p class="text-muted">Look at the camera to automatically sign in/out</p>
+                
+                <!-- Button to open camera (initially visible) -->
+                <div id="startButtonContainer">
+                    <button id="startCameraBtn" class="btn btn-primary btn-lg" onclick="startAttendanceCamera()">
+                        <i class="fas fa-camera me-2"></i>Take Attendance
+                    </button>
+                </div>
+                
+                <!-- Camera section (initially hidden) -->
+                <div id="attendanceCameraSection" style="display: none;">
+                    <label class="form-label">📸 Face Recognition - Look at the camera</label>
+                    <div class="camera-container" style="position: relative; width: 100%; height: 350px; background: #000; border-radius: 15px; overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,0.2);">
+                        <video id="attendanceVideo" width="100%" height="100%" autoplay muted playsinline style="object-fit: cover;"></video>
+                        <div id="attendanceFaceGuide" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 198px; height: 252px; border: 4px solid rgba(255, 255, 255, 0.9); border-radius: 50% 50% 45% 45% / 55% 55% 45% 45%; box-shadow: 0 0 0 2000px rgba(128, 128, 128, 0.95); pointer-events: none; transition: border-color 0.3s ease; z-index: 10;">
+                            <div id="attendanceFaceGuideLabel" style="position: absolute; bottom: -35px; left: 50%; transform: translateX(-50%); color: white; font-size: 14px; white-space: nowrap; text-shadow: 1px 1px 2px black; background: rgba(0,0,0,0.7); padding: 5px 15px; border-radius: 20px; pointer-events: none; z-index: 11;">Look here</div>
+                        </div>
+                        <!-- Status overlay -->
+                        <div id="attendanceStatusOverlay" style="position: absolute; bottom: 20px; left: 20px; right: 20px; background: rgba(0,0,0,0.8); color: white; padding: 12px; border-radius: 50px; text-align: center; font-weight: bold; z-index: 15; display: none;"></div>
+                        
+                        <!-- Close button -->
+                        <button id="closeCameraBtn" class="btn btn-sm btn-danger" style="position: absolute; top: 10px; right: 10px; z-index: 20; border-radius: 50%; width: 40px; height: 40px;" onclick="closeCameraSection()">
+                            <i class="fas fa-times"></i>
+                        </button>
                     </div>
                     
-                    <div id="attendanceCameraSection" style="display:none;">
-                        <label class="form-label">📸 Face Verification Required (60% match threshold)</label>
-                        <div class="camera-container" style="position: relative; width: 100%; height: 350px; background: #000; border-radius: 15px; overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,0.2);">
-                            <video id="attendanceVideo" width="100%" height="100%" autoplay muted playsinline style="object-fit: cover;"></video>
-                            <div id="attendanceFaceGuide" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 198px; height: 252px; border: 4px solid rgba(255, 255, 255, 0.9); border-radius: 50% 50% 45% 45% / 55% 55% 45% 45%; box-shadow: 0 0 0 2000px rgba(128, 128, 128, 0.95); pointer-events: none; transition: border-color 0.3s ease; z-index: 10;">
-                                <div id="attendanceFaceGuideLabel" style="position: absolute; bottom: -35px; left: 50%; transform: translateX(-50%); color: white; font-size: 14px; white-space: nowrap; text-shadow: 1px 1px 2px black; background: rgba(0,0,0,0.7); padding: 5px 15px; border-radius: 20px; pointer-events: none; z-index: 11;">Position face here</div>
-                            </div>
-                        </div>
-                        
-                        <div id="attendanceFaceStatus" class="mt-2 fw-bold"></div>
-                        <div class="progress mt-2" id="attendanceQualityBar" style="height: 8px; display: none;">
-                            <div class="progress-bar" id="attendanceQualityFill" role="progressbar" style="width: 0%; background: #28a745;"></div>
-                        </div>
-                        <div id="positionFeedback" class="mt-2" style="display: none; padding: 8px; border-radius: 5px; font-weight: 500;"></div>
-                        
-                        <canvas id="cropCanvas" style="display:none;"></canvas>
-                        <canvas id="attendanceCanvas" style="display:none;"></canvas>
-                        <img id="attendanceSnapshot" style="max-width:100%; border-radius:10px; display:none;" class="mt-2">
+                    <div id="attendanceFaceStatus" class="mt-3 fw-bold"></div>
+                    <div class="progress mt-2" id="attendanceQualityBar" style="height: 8px;">
+                        <div class="progress-bar" id="attendanceQualityFill" role="progressbar" style="width: 0%; background: #28a745;"></div>
                     </div>
-                </form>
-                <div id="attendanceResultBox" class="mt-3"></div>
+                    
+                    <div id="attendanceResult" class="mt-3"></div>
+                    
+                    <canvas id="cropCanvas" style="display:none;"></canvas>
+                    <canvas id="attendanceCanvas" style="display:none;"></canvas>
+                    <img id="attendanceSnapshot" style="max-width:100%; border-radius:10px; display:none;" class="mt-2">
+                </div>
             </div>
         </div>
     </div>
 </div>
 
 <style>
-    .flash-message { animation: flash 0.2s ease-out; }
-    @keyframes flash { 0% { opacity: 1; } 50% { opacity: 0.3; } 100% { opacity: 1; } }
     #attendanceVideo { background: #000; border-radius: 8px; }
     .camera-container { position: relative; width: 100%; height: 350px; background: #000; border-radius: 15px; overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,0.2); }
-    .position-warning { background-color: #fff3cd; color: #856404; border: 1px solid #ffeeba; }
-    .position-success { background-color: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
-    .position-info { background-color: #d1ecf1; color: #0c5460; border: 1px solid #bee5eb; }
+    .flash-message { animation: flash 0.2s ease-out; }
+    @keyframes flash { 0% { opacity: 1; } 50% { opacity: 0.3; } 100% { opacity: 1; } }
+    .match-found { border-color: #28a745 !important; background-color: rgba(40, 167, 69, 0.2); }
+    .recognizing { border-color: #ffc107 !important; background-color: rgba(255, 193, 7, 0.2); }
+    #attendanceStatusOverlay { transition: all 0.3s ease; }
+    #startCameraBtn {
+        padding: 15px 40px;
+        font-size: 1.2rem;
+        transition: transform 0.2s;
+    }
+    #startCameraBtn:hover {
+        transform: scale(1.05);
+    }
 </style>
 
 <script>
 let attendanceStream = null;
-let attendanceFaceDetected = false;
 let isProcessing = false;
 let hasCaptured = false;
 let isSubmitting = false;
 let detectionFrame = null;
-let currentEmpId = '';
-let cameraStarted = false;
 let lastDetectionTime = 0;
-let consecutiveDetections = 0;
+let consecutiveGoodFrames = 0;
+let matchFoundFrame = null;
+let captureTimeout = null;
+let currentEmployee = null;
+
 const DETECTION_THROTTLE_MS = 200;
 const FRAME_WIDTH = 198;
 const FRAME_HEIGHT = 252;
-const REQUIRED_CONSECUTIVE = 2;
+const REQUIRED_GOOD_FRAMES = 5;
 const MIN_QUALITY = 0.30;
-// Match threshold changed from 65% to 60%
-const MATCH_THRESHOLD = 60;
 
-const attendanceEmpidInput = document.getElementById('attendanceEmpid');
-const attendanceValidationMsg = document.getElementById('attendanceValidationMsg');
+const startButtonContainer = document.getElementById('startButtonContainer');
 const attendanceCameraSection = document.getElementById('attendanceCameraSection');
 const attendanceVideo = document.getElementById('attendanceVideo');
 const attendanceSnapshot = document.getElementById('attendanceSnapshot');
-const attendanceCanvas = document.getElementById('attendanceCanvas');
 const cropCanvas = document.getElementById('cropCanvas');
-const attendanceResultBox = document.getElementById('attendanceResultBox');
+const attendanceResult = document.getElementById('attendanceResult');
 const attendanceQualityBar = document.getElementById('attendanceQualityBar');
 const attendanceQualityFill = document.getElementById('attendanceQualityFill');
 const attendanceFaceStatus = document.getElementById('attendanceFaceStatus');
 const attendanceFaceGuide = document.getElementById('attendanceFaceGuide');
 const attendanceFaceGuideLabel = document.getElementById('attendanceFaceGuideLabel');
-const positionFeedback = document.getElementById('positionFeedback');
+const attendanceStatusOverlay = document.getElementById('attendanceStatusOverlay');
 
-window.addEventListener('load', function() {
-    attendanceEmpidInput.value = '';
-    attendanceEmpidInput.focus();
+function closeCameraSection() {
+    console.log('🔒 Closing camera section');
     stopAttendanceCamera();
-});
-
-attendanceEmpidInput.addEventListener('input', function() {
-    const empid = this.value.trim().toUpperCase();
-    this.value = empid;
+    attendanceCameraSection.style.display = 'none';
+    startButtonContainer.style.display = 'block';
     
-    if (empid.length >= 4) {
-        attendanceValidationMsg.innerHTML = `<div class="alert alert-info">⏳ Validating employee ID...</div>`;
-        
-        fetch(`/employees?employeeid=${encodeURIComponent(empid)}`)
-            .then(response => response.text())
-            .then(data => {
-                if (data.includes(empid)) {
-                    attendanceValidationMsg.innerHTML = `<div class="alert alert-success">✅ Employee ${empid} found! Starting camera...</div>`;
-                    currentEmpId = empid;
-                    
-                    if (!cameraStarted && !hasCaptured && !isSubmitting) {
-                        setTimeout(() => startAttendanceCamera(), 500);
-                    }
-                } else {
-                    attendanceValidationMsg.innerHTML = `<div class="alert alert-danger">❌ Employee ID ${empid} not found</div>`;
-                    stopAttendanceCamera();
-                    cameraStarted = false;
-                }
-            })
-            .catch(err => {
-                console.error('Validation error:', err);
-                attendanceValidationMsg.innerHTML = `<div class="alert alert-danger">❌ Error validating employee ID: ${err.message}</div>`;
-                stopAttendanceCamera();
-                cameraStarted = false;
-            });
-    } else {
-        attendanceValidationMsg.innerHTML = '';
-        stopAttendanceCamera();
-        cameraStarted = false;
+    // Reset all states
+    isProcessing = false;
+    hasCaptured = false;
+    isSubmitting = false;
+    consecutiveGoodFrames = 0;
+    matchFoundFrame = null;
+    currentEmployee = null;
+    
+    // Clear any results
+    attendanceResult.innerHTML = '';
+    attendanceFaceStatus.innerHTML = '';
+    attendanceQualityFill.style.width = '0%';
+    attendanceStatusOverlay.style.display = 'none';
+}
+
+function startAttendanceCamera() {
+    console.log('📷 Starting camera');
+    startButtonContainer.style.display = 'none';
+    attendanceCameraSection.style.display = 'block';
+    
+    // Reset states
+    isProcessing = false;
+    hasCaptured = false;
+    isSubmitting = false;
+    consecutiveGoodFrames = 0;
+    matchFoundFrame = null;
+    currentEmployee = null;
+    attendanceResult.innerHTML = '';
+    attendanceStatusOverlay.style.display = 'none';
+    
+    attendanceFaceStatus.innerHTML = '🔍 Initializing camera...';
+    attendanceFaceStatus.className = 'text-info';
+    
+    navigator.mediaDevices.getUserMedia({ 
+        video: { 
+            facingMode: 'user', 
+            width: { ideal: 640 }, 
+            height: { ideal: 480 } 
+        } 
+    })
+    .then(stream => {
+        attendanceStream = stream;
+        attendanceVideo.srcObject = stream;
+        attendanceVideo.onloadedmetadata = () => {
+            attendanceFaceStatus.innerHTML = '👤 Look at the camera';
+            startAttendanceFaceDetection();
+        };
+    })
+    .catch(err => {
+        console.error('Camera error:', err);
+        attendanceResult.innerHTML = `
+            <div class="alert alert-danger">
+                Camera access denied: ${err.message}
+            </div>
+        `;
+        closeCameraSection();
+    });
+}
+
+function stopAttendanceCamera() {
+    console.log('🛑 Stopping camera');
+    if (attendanceStream) {
+        attendanceStream.getTracks().forEach(track => track.stop());
+        attendanceStream = null;
     }
-});
+    if (detectionFrame) {
+        cancelAnimationFrame(detectionFrame);
+        detectionFrame = null;
+    }
+    if (captureTimeout) {
+        clearTimeout(captureTimeout);
+        captureTimeout = null;
+    }
+}
 
 async function detectFaceWithAPI() {
     if (!attendanceVideo || !attendanceVideo.videoWidth || isProcessing || hasCaptured || isSubmitting) return null;
@@ -138,68 +190,41 @@ async function detectFaceWithAPI() {
     canvas.getContext('2d').drawImage(attendanceVideo, 0, 0);
     const imageData = canvas.toDataURL('image/jpeg', 0.8);
     
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 5000);
-    
     try {
         const response = await fetch('/detect_face', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({image: imageData}),
-            signal: controller.signal
+            body: JSON.stringify({image: imageData})
         });
-        clearTimeout(timeoutId);
         if (!response.ok) return null;
         return await response.json();
     } catch (error) {
-        clearTimeout(timeoutId);
+        console.error('Face detection error:', error);
         return null;
     }
 }
 
-function startAttendanceCamera() {
-    if (cameraStarted || hasCaptured || isSubmitting) return;
-    
-    cameraStarted = true;
-    isProcessing = false;
-    consecutiveDetections = 0;
-    attendanceCameraSection.style.display = 'block';
-    attendanceFaceStatus.innerHTML = '🔍 Detecting face...';
-    attendanceFaceStatus.className = 'text-info';
-    attendanceEmpidInput.disabled = true;
-    positionFeedback.style.display = 'block';
-    positionFeedback.className = 'position-info';
-    positionFeedback.innerHTML = '👤 Position your face in the frame (will verify against registered photo)';
-    
-    navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } } })
-        .then(stream => {
-            attendanceStream = stream;
-            attendanceVideo.srcObject = stream;
-            attendanceVideo.onloadedmetadata = () => startAttendanceFaceDetection();
-        })
-        .catch(err => {
-            attendanceValidationMsg.innerHTML = `<div class="alert alert-danger">Camera access denied: ${err.message}</div>`;
-            attendanceEmpidInput.disabled = false;
-            cameraStarted = false;
-            positionFeedback.style.display = 'none';
+async function matchFaceWithAPI(imageData) {
+    try {
+        console.log('🔍 Attempting to match face...');
+        const response = await fetch('/match_face', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({image: imageData})
         });
-}
-
-function stopAttendanceCamera() {
-    attendanceCameraSection.style.display = 'none';
-    if (attendanceStream) attendanceStream.getTracks().forEach(track => track.stop());
-    attendanceFaceDetected = false;
-    isProcessing = false;
-    cameraStarted = false;
-    consecutiveDetections = 0;
-    attendanceEmpidInput.disabled = false;
-    if (detectionFrame) cancelAnimationFrame(detectionFrame);
-    attendanceSnapshot.style.display = 'none';
-    attendanceQualityBar.style.display = 'none';
-    attendanceFaceStatus.innerHTML = '';
-    positionFeedback.style.display = 'none';
-    attendanceFaceGuide.style.borderColor = 'rgba(255, 255, 255, 0.9)';
-    attendanceFaceGuideLabel.textContent = 'Position face here';
+        
+        if (!response.ok) {
+            console.error('Match face response not OK:', response.status);
+            return null;
+        }
+        
+        const data = await response.json();
+        console.log('Match result:', data);
+        return data;
+    } catch (error) {
+        console.error('Face matching error:', error);
+        return null;
+    }
 }
 
 function cropFaceFromFrame() {
@@ -230,83 +255,112 @@ async function startAttendanceFaceDetection() {
         
         const result = await detectFaceWithAPI();
         
-        if (result && !isProcessing && !hasCaptured && !isSubmitting) {
-            attendanceFaceDetected = result.face_detected;
+        if (result && result.face_detected) {
+            const qualityPercent = Math.round(result.quality * 100);
+            attendanceQualityFill.style.width = `${qualityPercent}%`;
             
-            if (result.face_detected) {
-                attendanceQualityBar.style.display = 'block';
-                const qualityPercent = Math.round(result.quality * 100);
-                attendanceQualityFill.style.width = `${qualityPercent}%`;
+            if (result.quality >= MIN_QUALITY) {
+                attendanceQualityFill.style.background = '#28a745';
+                attendanceFaceGuide.style.borderColor = '#28a745';
+                consecutiveGoodFrames++;
                 
-                if (result.quality >= MIN_QUALITY) {
-                    attendanceQualityFill.style.background = '#28a745';
-                    attendanceFaceGuide.style.borderColor = '#28a745';
-                    consecutiveDetections++;
+                attendanceFaceStatus.innerHTML = `✅ Face detected (${qualityPercent}% quality)`;
+                attendanceFaceStatus.className = 'text-success';
+                attendanceFaceGuideLabel.textContent = '✅ Processing...';
+                
+                if (consecutiveGoodFrames >= REQUIRED_GOOD_FRAMES && !matchFoundFrame) {
+                    matchFoundFrame = true;
+                    isProcessing = true;
                     
-                    if (consecutiveDetections >= REQUIRED_CONSECUTIVE) {
-                        attendanceFaceStatus.innerHTML = `✅ Face detected! Verifying with registered photo...`;
-                        attendanceFaceStatus.className = 'text-success';
-                        attendanceFaceGuideLabel.textContent = '✅ Verifying...';
-                        captureImmediately();
+                    attendanceFaceStatus.innerHTML = '🔍 Matching with registered employees...';
+                    attendanceStatusOverlay.style.display = 'block';
+                    attendanceStatusOverlay.innerHTML = '🔍 Searching for match...';
+                    
+                    const croppedImageData = cropFaceFromFrame();
+                    
+                    const matchResult = await matchFaceWithAPI(croppedImageData);
+                    
+                    if (matchResult && matchResult.match_found) {
+                        currentEmployee = matchResult.employee;
+                        attendanceStatusOverlay.innerHTML = `✅ Match found: ${currentEmployee.name}`;
+                        attendanceStatusOverlay.style.background = 'rgba(40, 167, 69, 0.9)';
+                        
+                        attendanceFaceStatus.innerHTML = `✅ Matched with ${currentEmployee.name} (${matchResult.confidence}%)`;
+                        
+                        console.log('✅ Match successful, capturing in 1 second...');
+                        captureTimeout = setTimeout(() => {
+                            captureImmediately(currentEmployee.employeeid, croppedImageData);
+                        }, 1000);
                     } else {
-                        attendanceFaceStatus.innerHTML = `✅ Face detected! Hold still...`;
-                        attendanceFaceStatus.className = 'text-success';
-                        attendanceFaceGuideLabel.textContent = '✅ Hold still';
-                        positionFeedback.innerHTML = `✅ Face quality: ${qualityPercent}% - Hold still for verification`;
-                        positionFeedback.className = 'position-info';
+                        console.log('❌ No match found');
+                        attendanceStatusOverlay.style.display = 'none';
+                        attendanceFaceStatus.innerHTML = '❌ No matching employee found';
+                        attendanceFaceStatus.className = 'text-danger';
+                        attendanceFaceGuide.style.borderColor = '#dc3545';
+                        
+                        setTimeout(() => {
+                            isProcessing = false;
+                            matchFoundFrame = null;
+                            consecutiveGoodFrames = 0;
+                            attendanceStatusOverlay.style.display = 'none';
+                            attendanceFaceStatus.innerHTML = '👤 Look at the camera';
+                            attendanceFaceStatus.className = 'text-info';
+                        }, 3000);
                     }
-                } else {
-                    attendanceQualityFill.style.background = '#ffc107';
-                    attendanceFaceStatus.innerHTML = `⚠️ Quality too low: ${qualityPercent}%`;
-                    attendanceFaceStatus.className = 'text-warning';
-                    attendanceFaceGuide.style.borderColor = '#ffc107';
-                    attendanceFaceGuideLabel.textContent = '⚠️ Low quality';
-                    positionFeedback.innerHTML = `⚠️ Face quality: ${qualityPercent}% - Please ensure good lighting`;
-                    positionFeedback.className = 'position-warning';
-                    consecutiveDetections = 0;
                 }
             } else {
-                attendanceQualityBar.style.display = 'none';
-                attendanceFaceStatus.innerHTML = '👤 No face detected';
-                attendanceFaceStatus.className = 'text-muted';
-                attendanceFaceGuide.style.borderColor = 'rgba(255, 255, 255, 0.9)';
-                attendanceFaceGuideLabel.textContent = 'Position face here';
-                positionFeedback.innerHTML = '👤 Please position your face in the frame';
-                positionFeedback.className = 'position-info';
-                consecutiveDetections = 0;
+                attendanceQualityFill.style.background = '#ffc107';
+                attendanceFaceGuide.style.borderColor = '#ffc107';
+                attendanceFaceStatus.innerHTML = `⚠️ Low quality (${qualityPercent}%) - Move closer`;
+                attendanceFaceStatus.className = 'text-warning';
+                attendanceFaceGuideLabel.textContent = '⚠️ Low quality';
+                consecutiveGoodFrames = 0;
+                matchFoundFrame = null;
             }
+        } else {
+            attendanceQualityFill.style.width = '0%';
+            attendanceFaceGuide.style.borderColor = 'rgba(255, 255, 255, 0.9)';
+            attendanceFaceStatus.innerHTML = '👤 No face detected';
+            attendanceFaceStatus.className = 'text-muted';
+            attendanceFaceGuideLabel.textContent = 'Look here';
+            consecutiveGoodFrames = 0;
+            matchFoundFrame = null;
         }
+        
         detectionFrame = requestAnimationFrame(detectFaces);
     };
+    
     detectFaces();
 }
 
-function captureImmediately() {
-    if (isProcessing || hasCaptured || isSubmitting) return;
-    isProcessing = true;
+function captureImmediately(empid, imageData) {
+    if (hasCaptured || isSubmitting) return;
     hasCaptured = true;
-    attendanceFaceStatus.innerHTML = `📸 Capturing for verification...`;
-    attendanceVideo.classList.add('flash-message');
-    setTimeout(() => attendanceVideo.classList.remove('flash-message'), 200);
     
-    const croppedImageData = cropFaceFromFrame();
-    attendanceSnapshot.src = croppedImageData;
+    console.log('📸 Capturing image for employee:', empid);
+    attendanceSnapshot.src = imageData;
     attendanceSnapshot.style.display = 'block';
-    stopAttendanceCamera();
+    attendanceVideo.classList.add('flash-message');
+    attendanceStatusOverlay.innerHTML = '📸 Capturing...';
     
-    // Submit to live_attendance endpoint instead of take_attendance
-    submitLiveAttendance(currentEmpId, croppedImageData);
+    setTimeout(() => {
+        attendanceVideo.classList.remove('flash-message');
+        submitLiveAttendance(empid, imageData);
+    }, 200);
 }
 
 function submitLiveAttendance(empid, imageData) {
     if (isSubmitting) return;
     isSubmitting = true;
     
+    console.log('📤 Submitting attendance for employee:', empid);
+    
     const formData = new URLSearchParams();
     formData.append('employeeid', empid);
     formData.append('captured_image', imageData);
     
-    attendanceFaceStatus.innerHTML = '⏳ Verifying face match...';
+    attendanceStatusOverlay.innerHTML = '⏳ Recording attendance...';
+    attendanceFaceStatus.innerHTML = '⏳ Processing...';
     
     fetch('/live_attendance', { 
         method: 'POST', 
@@ -314,7 +368,10 @@ function submitLiveAttendance(empid, imageData) {
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
     })
     .then(async response => {
+        console.log('Response status:', response.status);
         const text = await response.text();
+        console.log('Response text:', text);
+        
         if (!response.ok) {
             try {
                 const data = JSON.parse(text);
@@ -326,44 +383,51 @@ function submitLiveAttendance(empid, imageData) {
         return JSON.parse(text);
     })
     .then(data => {
+        console.log('✅ Attendance success:', data);
         if (data.status === 'ok') {
-            attendanceResultBox.innerHTML = `
+            const action = data.action === 'signed_in' ? 'Signed In' : 'Signed Out';
+            attendanceResult.innerHTML = `
                 <div class="alert alert-success">
-                    <strong>✅ ${data.message || 'Live attendance recorded!'}</strong><br>
-                    <small>${data.action === 'signed_in' ? 'Signed In' : 'Signed Out'} with ${data.confidence}% match</small>
+                    <strong>✅ ${currentEmployee?.name || 'Employee'} ${action}!</strong><br>
+                    <small>Confidence: ${data.confidence}%</small>
                 </div>`;
-            setTimeout(() => window.location.reload(), 2000);
+            attendanceStatusOverlay.innerHTML = `✅ ${action} successfully!`;
+            attendanceStatusOverlay.style.background = 'rgba(40, 167, 69, 0.9)';
+            
+            // Auto-close after 2 seconds on success
+            console.log('✅ Success, closing in 2 seconds...');
+            setTimeout(() => {
+                closeCameraSection();
+            }, 2000);
         } else {
             throw new Error(data.msg || 'Unknown error');
         }
     })
     .catch(err => {
-        console.error('Submission error:', err);
-        // Check if error message contains the confidence requirement
-        if (err.message.includes('need 65%')) {
-            // Replace 65% with 60% in the error message
-            err.message = err.message.replace('65%', '60%');
-        }
-        attendanceResultBox.innerHTML = `
+        console.error('❌ Attendance submission error:', err);
+        attendanceResult.innerHTML = `
             <div class="alert alert-danger">
-                <strong>❌ Verification Failed:</strong> ${err.message}<br>
-                <small>Minimum confidence required: ${MATCH_THRESHOLD}%</small>
+                <strong>❌ Failed:</strong> ${err.message}<br>
+                <small>Please try again</small>
             </div>`;
+        attendanceStatusOverlay.style.display = 'none';
+        
+        // Reset on failure after a delay
         setTimeout(() => {
             isProcessing = false;
             hasCaptured = false;
             isSubmitting = false;
-            attendanceEmpidInput.value = '';
-            attendanceEmpidInput.focus();
-            cameraStarted = false;
-            consecutiveDetections = 0;
+            matchFoundFrame = null;
+            consecutiveGoodFrames = 0;
+            attendanceSnapshot.style.display = 'none';
+            attendanceFaceStatus.innerHTML = '👤 Try again - Look at the camera';
+            attendanceFaceStatus.className = 'text-info';
         }, 3000);
     });
 }
 
 window.addEventListener('beforeunload', function() {
-    if (attendanceStream) attendanceStream.getTracks().forEach(track => track.stop());
-    if (detectionFrame) cancelAnimationFrame(detectionFrame);
+    stopAttendanceCamera();
 });
 </script>
 {% endblock %}

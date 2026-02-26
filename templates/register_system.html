@@ -1,0 +1,43 @@
+{% extends "layout.html" %}
+{% block body %}
+<div class="row justify-content-center">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header bg-primary text-white">
+                <h4 class="mb-0"><i class="fas fa-laptop me-2"></i>Register System</h4>
+            </div>
+            <div class="card-body">
+                <form method="POST">
+                    {{ form.hidden_tag() }}
+                    <div class="mb-3">
+                        {{ form.system_name.label(class="form-label") }}
+                        {{ form.system_name(class="form-control", placeholder="e.g., Office Desktop #1") }}
+                    </div>
+                    <div class="mb-3">
+                        {{ form.mac_address.label(class="form-label") }}
+                        {{ form.mac_address(class="form-control", placeholder="AA:BB:CC:DD:EE:FF") }}
+                    </div>
+                    <div class="mb-3">
+                        {{ form.cpu_id.label(class="form-label") }}
+                        {{ form.cpu_id(class="form-control", placeholder="CPU Serial Number") }}
+                    </div>
+                    <div class="mb-3">
+                        {{ form.motherboard_serial.label(class="form-label") }}
+                        {{ form.motherboard_serial(class="form-control", placeholder="Motherboard Serial") }}
+                    </div>
+                    <div class="mb-3">
+                        {{ form.notes.label(class="form-label") }}
+                        {{ form.notes(class="form-control", rows="3") }}
+                    </div>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-save me-2"></i>Register System
+                    </button>
+                    <a href="{{ url_for('list_systems') }}" class="btn btn-secondary">
+                        <i class="fas fa-arrow-left me-2"></i>Back
+                    </a>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -162,7 +162,7 @@
                     <th>Sign Out Confidence</th>
                     <th>Face Quality</th>
                     <th>Liveness</th>
-                    <th>Images</th>
+                    <th style="min-width: 150px;">Images</th>
                     <th>Status</th>
                     <th>Actions</th>
                 </tr>
@@ -257,21 +257,33 @@
                         {% endif %}
                     </td>
                     <td>
-                        <div class="d-flex gap-1">
+                        <div class="d-flex gap-2 align-items-center" style="min-width: 150px;">
                             {% if t.registered_image %}
-                            <img src="{{ url_for('uploads', filename=t.registered_image.split('/')[-1]) }}" 
-                                 height="35" class="rounded border" title="Registered" 
-                                 onclick="showImage(this.src); event.stopPropagation();" style="cursor: pointer;">
+                            <div class="text-center" style="width: 45px;">
+                                <img src="{{ url_for('uploads', filename=t.registered_image.split('/')[-1]) }}" 
+                                     height="40" width="40" class="rounded border img-thumbnail" title="Registered Photo" 
+                                     onclick="showImage(this.src, 'Registered Photo'); event.stopPropagation();" 
+                                     style="cursor: pointer; object-fit: cover;">
+                                <small class="d-block text-muted" style="font-size: 10px;">Registered</small>
+                            </div>
                             {% endif %}
                             {% if t.signin_image %}
-                            <img src="{{ url_for('uploads', filename=t.signin_image.split('/')[-1]) }}" 
-                                 height="35" class="rounded border" title="Sign In"
-                                 onclick="showImage(this.src); event.stopPropagation();" style="cursor: pointer;">
+                            <div class="text-center" style="width: 45px;">
+                                <img src="{{ url_for('uploads', filename=t.signin_image.split('/')[-1]) }}" 
+                                     height="40" width="40" class="rounded border img-thumbnail" title="Sign In Photo"
+                                     onclick="showImage(this.src, 'Sign In Photo - {{ t.time_in.strftime('%H:%M') if t.time_in else '' }}'); event.stopPropagation();" 
+                                     style="cursor: pointer; object-fit: cover;">
+                                <small class="d-block text-muted" style="font-size: 10px;">Sign In</small>
+                            </div>
                             {% endif %}
                             {% if t.signout_image %}
-                            <img src="{{ url_for('uploads', filename=t.signout_image.split('/')[-1]) }}" 
-                                 height="35" class="rounded border" title="Sign Out"
-                                 onclick="showImage(this.src); event.stopPropagation();" style="cursor: pointer;">
+                            <div class="text-center" style="width: 45px;">
+                                <img src="{{ url_for('uploads', filename=t.signout_image.split('/')[-1]) }}" 
+                                     height="40" width="40" class="rounded border img-thumbnail" title="Sign Out Photo"
+                                     onclick="showImage(this.src, 'Sign Out Photo - {{ t.time_out.strftime('%H:%M') if t.time_out else '' }}'); event.stopPropagation();" 
+                                     style="cursor: pointer; object-fit: cover;">
+                                <small class="d-block text-muted" style="font-size: 10px;">Sign Out</small>
+                            </div>
                             {% endif %}
                         </div>
                     </td>
@@ -406,14 +418,14 @@
 
 <!-- Image Modal -->
 <div class="modal fade" id="imageModal" tabindex="-1">
-    <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-dialog modal-dialog-centered modal-lg">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title">Face Image</h5>
+                <h5 class="modal-title" id="imageModalTitle">Face Image</h5>
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body text-center">
-                <img id="modalImage" src="" class="img-fluid rounded">
+                <img id="modalImage" src="" class="img-fluid rounded" style="max-height: 500px;">
             </div>
         </div>
     </div>
@@ -449,8 +461,9 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 });
 
-function showImage(src) {
+function showImage(src, title = 'Face Image') {
     document.getElementById('modalImage').src = src;
+    document.getElementById('imageModalTitle').textContent = title;
     imageModal.show();
 }
 
@@ -475,9 +488,9 @@ async function showReceipt(id) {
         
         const cells = row.cells;
         
-        const regImg = cells[11].querySelector('img[title="Registered"]');
-        const signinImg = cells[11].querySelector('img[title="Sign In"]');
-        const signoutImg = cells[11].querySelector('img[title="Sign Out"]');
+        const regImg = cells[11].querySelector('img[title="Registered Photo"]');
+        const signinImg = cells[11].querySelector('img[title^="Sign In Photo"]');
+        const signoutImg = cells[11].querySelector('img[title^="Sign Out Photo"]');
         
         const signinConfText = cells[7].innerText.match(/([\d.]+)%/)?.[1] || '0';
         const signoutConfText = cells[8].innerText.match(/([\d.]+)%/)?.[1] || '0';
@@ -542,8 +555,34 @@ function generateReceiptHTML(data) {
                 </div>
             </div>
             
-            <div style="text-align: center; margin-top: 4px;">
-                <a href="{{ url_for('timesheet') }}" class="btn btn-sm btn-outline-primary">Back to Today</a>
+            <div style="display: flex; gap: 10px; margin-bottom: 15px;">
+                ${data.reg_photo ? `
+                <div style="flex: 1; text-align: center;">
+                    <img src="${data.reg_photo}" style="max-width: 100%; max-height: 100px; border-radius: 5px;" onclick="showImage('${data.reg_photo}', 'Registered Photo')">
+                    <small class="d-block">Registered</small>
+                </div>
+                ` : ''}
+                ${data.signin_photo ? `
+                <div style="flex: 1; text-align: center;">
+                    <img src="${data.signin_photo}" style="max-width: 100%; max-height: 100px; border-radius: 5px;" onclick="showImage('${data.signin_photo}', 'Sign In Photo')">
+                    <small class="d-block">Sign In</small>
+                </div>
+                ` : ''}
+                ${data.signout_photo ? `
+                <div style="flex: 1; text-align: center;">
+                    <img src="${data.signout_photo}" style="max-width: 100%; max-height: 100px; border-radius: 5px;" onclick="showImage('${data.signout_photo}', 'Sign Out Photo')">
+                    <small class="d-block">Sign Out</small>
+                </div>
+                ` : ''}
+            </div>
+            
+            <div style="background: #f8f9fa; padding: 15px; border-radius: 8px;">
+                <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                    <div style="flex: 1;"><strong>Confidence:</strong> ${data.signin_confidence}% / ${data.signout_confidence}%</div>
+                    <div style="flex: 1;"><strong>Face Quality:</strong> ${data.face_quality}</div>
+                    <div style="flex: 1;"><strong>Liveness:</strong> ${data.liveness}</div>
+                </div>
+                <div class="mt-2"><strong>Status:</strong> ${data.status}</div>
             </div>
         </div>
     `;
@@ -595,9 +634,23 @@ document.addEventListener('keydown', (e) => {
 .card:hover { transform: translateY(-2px); box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
 .table-danger { border-left: 5px solid #dc3545; }
 .table-warning { border-left: 5px solid #ffc107; }
-img.rounded { transition: transform 0.2s; }
-img.rounded:hover { transform: scale(1.5); z-index: 1000; box-shadow: 0 4px 8px rgba(0,0,0,0.2); }
+.img-thumbnail { 
+    transition: transform 0.2s, box-shadow 0.2s; 
+    border: 2px solid #dee2e6;
+}
+.img-thumbnail:hover { 
+    transform: scale(2.5); 
+    z-index: 1000; 
+    box-shadow: 0 8px 16px rgba(0,0,0,0.3);
+    position: relative;
+    border-color: #0d6efd;
+}
 .receipt-container { font-family: 'Courier New', monospace; }
 .modal-lg { max-width: 700px; }
+.d-flex.gap-2.align-items-center {
+    background: #f8f9fa;
+    padding: 8px;
+    border-radius: 8px;
+}
 </style>
 {% endblock %}

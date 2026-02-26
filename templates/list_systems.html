@@ -1,0 +1,59 @@
+{% extends "layout.html" %}
+{% block body %}
+<h3><i class="fas fa-laptop me-2"></i>Registered Systems</h3>
+<a href="{{ url_for('register_system') }}" class="btn btn-success mb-3">
+    <i class="fas fa-plus me-2"></i>Register New System
+</a>
+
+<table class="table table-hover table-bordered">
+    <thead class="table-dark">
+        <tr>
+            <th>ID</th>
+            <th>System Name</th>
+            <th>MAC Address</th>
+            <th>CPU ID</th>
+            <th>Motherboard Serial</th>
+            <th>Registered</th>
+            <th>Last Accessed</th>
+            <th>Status</th>
+            <th>Actions</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for system in systems %}
+        <tr>
+            <td>{{ system.id }}</td>
+            <td>{{ system.system_name }}</td>
+            <td><code>{{ system.mac_address }}</code></td>
+            <td><code>{{ system.cpu_id[:20] }}...</code></td>
+            <td><code>{{ system.motherboard_serial[:15] }}...</code></td>
+            <td>{{ system.registered_at.strftime('%Y-%m-%d') }}</td>
+            <td>{{ system.last_accessed.strftime('%Y-%m-%d %H:%M') if system.last_accessed else 'Never' }}</td>
+            <td>
+                {% if system.is_active %}
+                <span class="badge bg-success">Active</span>
+                {% else %}
+                <span class="badge bg-danger">Inactive</span>
+                {% endif %}
+            </td>
+            <td>
+                <button class="btn btn-sm btn-warning" onclick="toggleSystem({{ system.id }})">
+                    <i class="fas fa-toggle-{% if system.is_active %}on{% else %}off{% endif %}"></i>
+                    Toggle
+                </button>
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+<script>
+function toggleSystem(id) {
+    fetch(`/admin/systems/toggle/${id}`, {method: 'POST'})
+        .then(res => res.json())
+        .then(data => {
+            if (data.status === 'ok') location.reload();
+        });
+}
+</script>
+{% endblock %}

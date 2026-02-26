@@ -16,6 +16,23 @@
         </div>
     </div>
     
+    <!-- System Info Banner (for superadmin) - IP Whitelist Only -->
+    {% if current_user.role == 'superadmin' %}
+    <div class="alert alert-info alert-dismissible fade show mb-4" role="alert">
+        <div class="d-flex align-items-center">
+            <i class="fas fa-shield-alt fa-2x me-3"></i>
+            <div>
+                <strong>🔐 IP-Based Security Active</strong><br>
+                <small>Access is restricted to whitelisted IP addresses only. Hardware authentication has been disabled.</small>
+            </div>
+            <div class="ms-auto">
+                <span class="badge bg-success">Your IP: {{ request.remote_addr }}</span>
+            </div>
+        </div>
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+    {% endif %}
+    
     <!-- Summary Cards Row 1 - Basic Stats -->
     <div class="row mb-4">
         <div class="col-md-3">
@@ -500,6 +517,12 @@ document.addEventListener('DOMContentLoaded', function() {
     .card {
         break-inside: avoid;
     }
+}
+
+/* System Info Banner */
+.alert-info {
+    border-left: 5px solid #0d6efd;
+    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
 }
 </style>
 {% endblock %}

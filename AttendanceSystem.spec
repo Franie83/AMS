@@ -1,19 +1,19 @@
 # -*- mode: python ; coding: utf-8 -*-
 from PyInstaller.utils.hooks import collect_all
 
-datas = [('templates', 'templates'), ('uploads', 'uploads')]
+datas = [('templates', 'templates'), ('uploads', 'uploads'), ('C:\\Users\\USER\\Documents\\apps\\AMS\\venv39\\lib\\site-packages\\face_recognition_models', 'face_recognition_models')]
 binaries = []
-hiddenimports = ['face_recognition', 'dlib', 'face_recognition_models', 'PIL', 'numpy', 'scipy', 'skimage']
+hiddenimports = ['face_recognition', 'face_recognition_models', 'dlib']
 tmp_ret = collect_all('face_recognition')
 datas += tmp_ret[0]; binaries += tmp_ret[1]; hiddenimports += tmp_ret[2]
-tmp_ret = collect_all('dlib')
-datas += tmp_ret[0]; binaries += tmp_ret[1]; hiddenimports += tmp_ret[2]
 tmp_ret = collect_all('face_recognition_models')
+datas += tmp_ret[0]; binaries += tmp_ret[1]; hiddenimports += tmp_ret[2]
+tmp_ret = collect_all('dlib')
 datas += tmp_ret[0]; binaries += tmp_ret[1]; hiddenimports += tmp_ret[2]
 
 
 a = Analysis(
-    ['run_app.py'],
+    ['app.py'],
     pathex=[],
     binaries=binaries,
     datas=datas,

@@ -450,6 +450,22 @@
             margin-top: 10px;
             border: 3px solid #28a745;
         }
+        /* Duplicate image warning */
+        .duplicate-warning {
+            background: #dc3545;
+            color: white;
+            padding: 12px;
+            border-radius: 8px;
+            margin: 10px 0;
+            text-align: center;
+            font-weight: bold;
+            animation: shake 0.5s ease;
+        }
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            10%, 30%, 50%, 70%, 90% { transform: translateX(-5px); }
+            20%, 40%, 60%, 80% { transform: translateX(5px); }
+        }
     </style>
 </head>
 <body>
@@ -478,6 +494,10 @@
             <i class="fas fa-building"></i> Registering for MDA: <strong>{{ current_user.mda or 'Not Set' }}</strong>
             <br>
             <small>(MDA auto-set from your account)</small>
+        </div>
+        
+        <div id="duplicateWarning" class="duplicate-warning" style="display: none;">
+            ⚠️ This face image already exists in the system!
         </div>
         
         <div id="errorMessage" class="error-message"></div>
@@ -621,6 +641,7 @@
         let isSubmitting = false;
         let cameraActive = false;
         let faceFrame = null;
+        let capturedImageData = null;
         const DETECTION_THROTTLE_MS = 300;
         const FRAME_WIDTH = 132;
         const FRAME_HEIGHT = 168;
@@ -654,6 +675,7 @@
         const captureBtn = document.getElementById('captureBtn');
         const validationStatus = document.getElementById('validationStatus');
         const statusText = document.getElementById('statusText');
+        const duplicateWarning = document.getElementById('duplicateWarning');
 
         function showError(message, field = null) {
             successMessage.style.display = 'none';
@@ -800,6 +822,22 @@
             }
         }
 
+        async function checkDuplicateImage(imageData) {
+            try {
+                const response = await fetch('/check_duplicate_image', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({image: imageData})
+                });
+                
+                const result = await response.json();
+                return result;
+            } catch (error) {
+                console.error('Duplicate check error:', error);
+                return { is_duplicate: false };
+            }
+        }
+
         function startRegisterCamera() {
             if (hasCaptured || isSubmitting || cameraActive) return;
             
@@ -807,6 +845,7 @@
             startCameraBtn.style.display = 'none';
             validationStatus.style.display = 'none';
             registerCameraSection.style.display = 'block';
+            duplicateWarning.style.display = 'none';
             updateStatus("Camera starting...", 'active');
             
             navigator.mediaDevices.getUserMedia({ 
@@ -901,11 +940,10 @@
             return cropCanvas.toDataURL('image/jpeg', 0.9);
         }
 
-        function manualCapture() {
+        async function manualCapture() {
             if (isProcessing || hasCaptured || isSubmitting || !faceDetected) return;
             
             isProcessing = true;
-            hasCaptured = true;
             
             // Flash effect
             registerVideo.classList.add('flash-message');
@@ -914,8 +952,33 @@
             // Crop face from frame
             const croppedImageData = cropFaceFromFrame();
             
+            // Check for duplicate image
+            updateStatus("Checking for duplicate image...", 'active');
+            const duplicateCheck = await checkDuplicateImage(croppedImageData);
+            
+            if (duplicateCheck.is_duplicate) {
+                duplicateWarning.style.display = 'block';
+                updateStatus("❌ This face already exists in the system!", 'error');
+                
+                // Shake the face guide
+                faceGuide.style.animation = 'shake 0.5s ease';
+                setTimeout(() => {
+                    faceGuide.style.animation = '';
+                }, 500);
+                
+                // Reset
+                isProcessing = false;
+                return;
+            }
+            
+            // Hide duplicate warning if it was showing
+            duplicateWarning.style.display = 'none';
+            
+            hasCaptured = true;
+            
             // Save cropped image
             faceImageInput.value = croppedImageData;
+            capturedImageData = croppedImageData;
             
             // Show preview of cropped face
             croppedPreview.src = croppedImageData;
@@ -941,6 +1004,7 @@
             startCameraBtn.style.display = 'block';
             validationStatus.style.display = 'block';
             captureBtn.disabled = true;
+            duplicateWarning.style.display = 'none';
             updateValidationStatus();
             updateStatus('', 'ready');
         }
@@ -1007,6 +1071,14 @@
                     return;
                 }
                 
+                // Check for duplicate image error
+                if (text.includes('Face image already exists')) {
+                    duplicateWarning.style.display = 'block';
+                    showError('This face image is already registered to another employee.');
+                    resetForm();
+                    return;
+                }
+                
                 showError('Registration failed. Please try again.');
                 resetForm();
             })
@@ -1023,6 +1095,7 @@
             isSubmitting = false;
             cameraActive = false;
             faceImageInput.value = '';
+            capturedImageData = null;
             
             errorMessage.style.display = 'none';
             successMessage.style.display = 'none';
@@ -1033,6 +1106,7 @@
             captureBtn.disabled = true;
             captureBtn.style.display = 'block';
             croppedPreview.style.display = 'none';
+            duplicateWarning.style.display = 'none';
             updateValidationStatus();
             updateStatus('', 'ready');
         }
