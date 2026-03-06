@@ -97,7 +97,7 @@ const attendanceFaceGuideLabel = document.getElementById('attendanceFaceGuideLab
 const attendanceStatusOverlay = document.getElementById('attendanceStatusOverlay');
 
 function closeCameraSection() {
-    console.log('🔒 Closing camera section');
+    // Stop camera and hide camera section
     stopAttendanceCamera();
     attendanceCameraSection.style.display = 'none';
     startButtonContainer.style.display = 'block';
@@ -114,11 +114,10 @@ function closeCameraSection() {
     attendanceResult.innerHTML = '';
     attendanceFaceStatus.innerHTML = '';
     attendanceQualityFill.style.width = '0%';
-    attendanceStatusOverlay.style.display = 'none';
 }
 
 function startAttendanceCamera() {
-    console.log('📷 Starting camera');
+    // Hide start button and show camera section
     startButtonContainer.style.display = 'none';
     attendanceCameraSection.style.display = 'block';
     
@@ -130,7 +129,6 @@ function startAttendanceCamera() {
     matchFoundFrame = null;
     currentEmployee = null;
     attendanceResult.innerHTML = '';
-    attendanceStatusOverlay.style.display = 'none';
     
     attendanceFaceStatus.innerHTML = '🔍 Initializing camera...';
     attendanceFaceStatus.className = 'text-info';
@@ -151,18 +149,17 @@ function startAttendanceCamera() {
         };
     })
     .catch(err => {
-        console.error('Camera error:', err);
         attendanceResult.innerHTML = `
             <div class="alert alert-danger">
                 Camera access denied: ${err.message}
             </div>
         `;
+        // Show start button again if camera fails
         closeCameraSection();
     });
 }
 
 function stopAttendanceCamera() {
-    console.log('🛑 Stopping camera');
     if (attendanceStream) {
         attendanceStream.getTracks().forEach(track => track.stop());
         attendanceStream = null;
@@ -206,21 +203,17 @@ async function detectFaceWithAPI() {
 
 async function matchFaceWithAPI(imageData) {
     try {
-        console.log('🔍 Attempting to match face...');
         const response = await fetch('/match_face', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({image: imageData})
         });
-        
         if (!response.ok) {
-            console.error('Match face response not OK:', response.status);
+            const errorText = await response.text();
+            console.error('Match face error response:', errorText);
             return null;
         }
-        
-        const data = await response.json();
-        console.log('Match result:', data);
-        return data;
+        return await response.json();
     } catch (error) {
         console.error('Face matching error:', error);
         return null;
@@ -287,12 +280,10 @@ async function startAttendanceFaceDetection() {
                         
                         attendanceFaceStatus.innerHTML = `✅ Matched with ${currentEmployee.name} (${matchResult.confidence}%)`;
                         
-                        console.log('✅ Match successful, capturing in 1 second...');
                         captureTimeout = setTimeout(() => {
                             captureImmediately(currentEmployee.employeeid, croppedImageData);
                         }, 1000);
                     } else {
-                        console.log('❌ No match found');
                         attendanceStatusOverlay.style.display = 'none';
                         attendanceFaceStatus.innerHTML = '❌ No matching employee found';
                         attendanceFaceStatus.className = 'text-danger';
@@ -337,7 +328,6 @@ function captureImmediately(empid, imageData) {
     if (hasCaptured || isSubmitting) return;
     hasCaptured = true;
     
-    console.log('📸 Capturing image for employee:', empid);
     attendanceSnapshot.src = imageData;
     attendanceSnapshot.style.display = 'block';
     attendanceVideo.classList.add('flash-message');
@@ -353,8 +343,6 @@ function submitLiveAttendance(empid, imageData) {
     if (isSubmitting) return;
     isSubmitting = true;
     
-    console.log('📤 Submitting attendance for employee:', empid);
-    
     const formData = new URLSearchParams();
     formData.append('employeeid', empid);
     formData.append('captured_image', imageData);
@@ -368,10 +356,7 @@ function submitLiveAttendance(empid, imageData) {
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
     })
     .then(async response => {
-        console.log('Response status:', response.status);
         const text = await response.text();
-        console.log('Response text:', text);
-        
         if (!response.ok) {
             try {
                 const data = JSON.parse(text);
@@ -383,7 +368,6 @@ function submitLiveAttendance(empid, imageData) {
         return JSON.parse(text);
     })
     .then(data => {
-        console.log('✅ Attendance success:', data);
         if (data.status === 'ok') {
             const action = data.action === 'signed_in' ? 'Signed In' : 'Signed Out';
             attendanceResult.innerHTML = `
@@ -394,8 +378,7 @@ function submitLiveAttendance(empid, imageData) {
             attendanceStatusOverlay.innerHTML = `✅ ${action} successfully!`;
             attendanceStatusOverlay.style.background = 'rgba(40, 167, 69, 0.9)';
             
-            // Auto-close after 2 seconds on success
-            console.log('✅ Success, closing in 2 seconds...');
+            // Close the camera section after successful attendance
             setTimeout(() => {
                 closeCameraSection();
             }, 2000);
@@ -404,15 +387,14 @@ function submitLiveAttendance(empid, imageData) {
         }
     })
     .catch(err => {
-        console.error('❌ Attendance submission error:', err);
+        console.error('Submission error:', err);
         attendanceResult.innerHTML = `
             <div class="alert alert-danger">
-                <strong>❌ Failed:</strong> ${err.message}<br>
-                <small>Please try again</small>
+                <strong>❌ Failed:</strong> ${err.message}
             </div>`;
         attendanceStatusOverlay.style.display = 'none';
         
-        // Reset on failure after a delay
+        // Keep camera open on failure, but reset for another try
         setTimeout(() => {
             isProcessing = false;
             hasCaptured = false;

@@ -2,6 +2,22 @@
 {% block body %}
 <h3>Employees</h3>
 
+<!-- MDA Context Banner for Regular Users -->
+{% if user_role == 'user' and current_mda %}
+<div class="alert alert-info mb-3">
+    <i class="fas fa-info-circle me-2"></i>
+    You are viewing employees in <strong>{{ current_mda }}</strong> only.
+</div>
+{% endif %}
+
+<!-- If user has no MDA assigned -->
+{% if user_role == 'user' and not current_mda %}
+<div class="alert alert-warning mb-3">
+    <i class="fas fa-exclamation-triangle me-2"></i>
+    No MDA assigned to your account. Please contact administrator.
+</div>
+{% endif %}
+
 <div class="row mb-3">
   <div class="col">
     <form method="get" class="row g-2">
@@ -22,10 +38,25 @@
       </div>
       <div class="col-md-2">
         {% if user_role == 'superadmin' %}
-        <a href="{{ url_for('register') }}" class="btn btn-success w-100">+ Add Employee</a>
+        <a href="{{ url_for('register') }}" class="btn btn-success w-100">
+          <i class="fas fa-user-plus me-1"></i>Add Employee
+        </a>
         {% endif %}
       </div>
     </form>
+  </div>
+</div>
+
+<div class="row mb-3">
+  <div class="col">
+    <div class="btn-group" role="group">
+      <a href="{{ url_for('employees') }}" class="btn btn-outline-primary {% if not request.args.get('show_inactive') %}active{% endif %}">
+        <i class="fas fa-user-check me-1"></i>Active
+      </a>
+      <a href="{{ url_for('employees') }}?show_inactive=true" class="btn btn-outline-secondary {% if request.args.get('show_inactive') == 'true' %}active{% endif %}">
+        <i class="fas fa-user-slash me-1"></i>Show Inactive
+      </a>
+    </div>
   </div>
 </div>
 
@@ -52,14 +83,17 @@
         <th>Email</th>
         <th>Phone</th>
         <th>Role</th>
+        <th>User Account</th>
         <th>Registered Image</th>
         <th>Face Quality</th>
+        <th>Status</th>
         <th>Actions</th>
       </tr>
     </thead>
     <tbody>
-      {% for e in employees %}
-      <tr class="employee-row" data-id="{{ e.id }}" data-employeeid="{{ e.employeeid }}" style="cursor: pointer;">
+      {% for item in employees %}
+      {% set e = item.employee %}
+      <tr class="employee-row {% if not e.is_active %}table-secondary{% endif %}" data-id="{{ e.id }}" data-employeeid="{{ e.employeeid }}" style="cursor: pointer;">
         <td><strong>{{ e.employeeid }}</strong></td>
         <td>{{ e.name }}</td>
         <td>{{ e.mda or 'N/A' }}</td>
@@ -67,11 +101,34 @@
         <td>{{ e.phone or 'N/A' }}</td>
         <td>
           {% if e.role == 'superadmin' %}
-            <span class="badge" style="background-color: #8e44ad;">Super Admin</span>
-          {% elif e.role == 'admin' %}
-            <span class="badge bg-danger">Admin</span>
+            <span class="badge" style="background-color: #8e44ad;">Director</span>
+          {% elif e.role == 'admin' or e.role == 'manager' %}
+            <span class="badge bg-danger">Manager</span>
+          {% elif e.role == 'supervisor' %}
+            <span class="badge bg-warning">Supervisor</span>
           {% else %}
-            <span class="badge bg-primary">User</span>
+            <span class="badge bg-primary">Employee</span>
+          {% endif %}
+        </td>
+        <td>
+          {% if item.has_user %}
+            <span class="badge bg-success" title="Has user account">
+              <i class="fas fa-check-circle me-1"></i>Has User
+            </span>
+            {% if item.user_account %}
+            <small class="d-block text-muted">
+              Role: <span class="badge bg-secondary">{{ item.user_account.role }}</span>
+            </small>
+            {% endif %}
+          {% else %}
+            <span class="badge bg-secondary" title="No user account">
+              <i class="fas fa-times-circle me-1"></i>No User
+            </span>
+            {% if user_role == 'superadmin' and e.email %}
+            <button class="btn btn-sm btn-outline-success mt-1" onclick="createUserAccount({{ e.id }}, '{{ e.email }}')">
+              <i class="fas fa-user-plus me-1"></i>Create User
+            </button>
+            {% endif %}
           {% endif %}
         </td>
         <td class="text-center" onclick="event.stopPropagation();">
@@ -97,25 +154,42 @@
             <span class="badge bg-secondary">N/A</span>
           {% endif %}
         </td>
+        <td>
+          {% if e.is_active %}
+            <span class="badge bg-success">Active</span>
+          {% else %}
+            <span class="badge bg-secondary">Inactive</span>
+          {% endif %}
+        </td>
         <td onclick="event.stopPropagation();">
           <div class="btn-group btn-group-sm" role="group">
             {% if user_role == 'superadmin' %}
-              <a class="btn btn-primary" href="{{ url_for('edit_employee', id=e.id) }}" title="Edit">
-                <i class="fas fa-edit"></i> Edit
-              </a>
-              <button class="btn btn-danger" onclick="deleteEmp({{ e.id }}, '{{ e.name }}')" title="Delete">
-                <i class="fas fa-trash"></i> Delete
-              </button>
+              {% if e.is_active %}
+                <!-- Active employee - show Edit and Delete -->
+                <a class="btn btn-primary" href="{{ url_for('edit_employee', id=e.id) }}" title="Edit">
+                  <i class="fas fa-edit"></i> Edit
+                </a>
+                <button class="btn btn-danger" onclick="deleteEmp({{ e.id }}, '{{ e.name }}')" title="Delete">
+                  <i class="fas fa-trash"></i> Delete
+                </button>
+              {% else %}
+                <!-- Inactive employee - show Restore button -->
+                <button class="btn btn-success" onclick="restoreEmp({{ e.id }}, '{{ e.name }}')" title="Restore">
+                  <i class="fas fa-undo-alt"></i> Restore
+                </button>
+                <button class="btn btn-danger" onclick="permanentDeleteEmp({{ e.id }}, '{{ e.name }}')" title="Permanently Delete">
+                  <i class="fas fa-trash"></i> Permanent
+                </button>
+              {% endif %}
             {% elif user_role == 'admin' %}
+              <!-- Admin gets View only button -->
               <a class="btn btn-info" href="{{ url_for('edit_employee', id=e.id) }}" title="View">
                 <i class="fas fa-eye"></i> View
               </a>
-              <button class="btn btn-secondary" disabled title="View only - Contact Super Admin">
-                <i class="fas fa-lock"></i> Locked
-              </button>
             {% else %}
+              <!-- Regular users get disabled View button -->
               <button class="btn btn-secondary" disabled title="View only">
-                <i class="fas fa-eye"></i> View Only
+                <i class="fas fa-eye"></i> View
               </button>
             {% endif %}
           </div>
@@ -123,7 +197,7 @@
       </tr>
       {% else %}
       <tr>
-        <td colspan="9" class="text-center py-4">
+        <td colspan="11" class="text-center py-4">
           <div class="display-6 text-muted mb-3">👥</div>
           <h5>No employees found</h5>
           <p class="text-muted">
@@ -134,7 +208,9 @@
             {% endif %}
           </p>
           {% if user_role == 'superadmin' %}
-          <a href="{{ url_for('register') }}" class="btn btn-success">+ Add Employee</a>
+          <a href="{{ url_for('register') }}" class="btn btn-success">
+            <i class="fas fa-user-plus me-2"></i>Add Employee
+          </a>
           {% endif %}
         </td>
       </tr>
@@ -197,16 +273,77 @@
   </div>
 </div>
 
+<!-- Create User Modal -->
+<div class="modal fade" id="createUserModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header bg-success text-white">
+        <h5 class="modal-title">
+          <i class="fas fa-user-plus me-2"></i>Create User Account
+        </h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <form id="createUserForm">
+          <input type="hidden" id="create_user_employee_id" name="employee_id">
+          
+          <div class="mb-3">
+            <label class="form-label">Email</label>
+            <input type="email" class="form-control" id="create_user_email" readonly>
+          </div>
+          
+          <div class="mb-3">
+            <label class="form-label">Password</label>
+            <input type="password" class="form-control" id="create_user_password" required>
+          </div>
+          
+          <div class="mb-3">
+            <label class="form-label">Confirm Password</label>
+            <input type="password" class="form-control" id="create_user_confirm" required>
+          </div>
+          
+          <div class="password-requirements mt-2 mb-3">
+            <small class="text-muted">Password must contain:</small>
+            <ul class="list-unstyled mt-1">
+              <li id="reqLength" class="text-danger">
+                <i class="fas fa-times-circle me-1"></i>At least 8 characters
+              </li>
+              <li id="reqUpper" class="text-danger">
+                <i class="fas fa-times-circle me-1"></i>One uppercase letter
+              </li>
+              <li id="reqLower" class="text-danger">
+                <i class="fas fa-times-circle me-1"></i>One lowercase letter
+              </li>
+              <li id="reqNumber" class="text-danger">
+                <i class="fas fa-times-circle me-1"></i>One number
+              </li>
+              <li id="reqSpecial" class="text-danger">
+                <i class="fas fa-times-circle me-1"></i>One special character (!@#$%^&*)
+              </li>
+            </ul>
+          </div>
+        </form>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-success" onclick="submitCreateUser()">Create Account</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- html2pdf library -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 
 <script>
 let imageModal;
+let createUserModal;
 let currentEmployeeData = null;
 let currentReceiptElement = null;
 
 document.addEventListener('DOMContentLoaded', function() {
   imageModal = new bootstrap.Modal(document.getElementById('imageModal'));
+  createUserModal = new bootstrap.Modal(document.getElementById('createUserModal'));
   
   // Make employee rows clickable
   document.querySelectorAll('.employee-row').forEach(row => {
@@ -225,11 +362,157 @@ document.addEventListener('DOMContentLoaded', function() {
       showEmployeeReceipt(id, employeeId);
     });
   });
+  
+  // Password strength checker
+  const passwordInput = document.getElementById('create_user_password');
+  if (passwordInput) {
+    passwordInput.addEventListener('input', checkPasswordStrength);
+  }
+  
+  const confirmInput = document.getElementById('create_user_confirm');
+  if (confirmInput) {
+    confirmInput.addEventListener('input', checkPasswordMatch);
+  }
 });
 
 function showImage(src) {
   document.getElementById('modalImage').src = src;
   imageModal.show();
+}
+
+function createUserAccount(employeeId, email) {
+  document.getElementById('create_user_employee_id').value = employeeId;
+  document.getElementById('create_user_email').value = email;
+  document.getElementById('create_user_password').value = '';
+  document.getElementById('create_user_confirm').value = '';
+  createUserModal.show();
+}
+
+function checkPasswordStrength() {
+  const password = document.getElementById('create_user_password').value;
+  
+  // Check length
+  const lengthValid = password.length >= 8;
+  updateRequirement('reqLength', lengthValid);
+  
+  // Check uppercase
+  const upperValid = /[A-Z]/.test(password);
+  updateRequirement('reqUpper', upperValid);
+  
+  // Check lowercase
+  const lowerValid = /[a-z]/.test(password);
+  updateRequirement('reqLower', lowerValid);
+  
+  // Check number
+  const numberValid = /[0-9]/.test(password);
+  updateRequirement('reqNumber', numberValid);
+  
+  // Check special character
+  const specialValid = /[!@#$%^&*(),.?":{}|<>]/.test(password);
+  updateRequirement('reqSpecial', specialValid);
+  
+  checkPasswordMatch();
+}
+
+function updateRequirement(elementId, isValid) {
+  const element = document.getElementById(elementId);
+  if (element) {
+    const icon = element.querySelector('i');
+    if (isValid) {
+      element.classList.remove('text-danger');
+      element.classList.add('text-success');
+      icon.classList.remove('fa-times-circle');
+      icon.classList.add('fa-check-circle');
+    } else {
+      element.classList.remove('text-success');
+      element.classList.add('text-danger');
+      icon.classList.remove('fa-check-circle');
+      icon.classList.add('fa-times-circle');
+    }
+  }
+}
+
+function checkPasswordMatch() {
+  const password = document.getElementById('create_user_password').value;
+  const confirm = document.getElementById('create_user_confirm').value;
+  
+  const confirmInput = document.getElementById('create_user_confirm');
+  
+  if (confirm.length > 0 && password !== confirm) {
+    confirmInput.classList.add('is-invalid');
+    return false;
+  } else {
+    confirmInput.classList.remove('is-invalid');
+    return true;
+  }
+}
+
+async function submitCreateUser() {
+  const employeeId = document.getElementById('create_user_employee_id').value;
+  const password = document.getElementById('create_user_password').value;
+  const confirm = document.getElementById('create_user_confirm').value;
+  
+  if (!password) {
+    alert('Password is required');
+    return;
+  }
+  
+  if (password !== confirm) {
+    alert('Passwords do not match');
+    return;
+  }
+  
+  // Check password strength
+  const requirements = {
+    length: password.length >= 8,
+    upper: /[A-Z]/.test(password),
+    lower: /[a-z]/.test(password),
+    number: /[0-9]/.test(password),
+    special: /[!@#$%^&*(),.?":{}|<>]/.test(password)
+  };
+  
+  if (!requirements.length || !requirements.upper || !requirements.lower || 
+      !requirements.number || !requirements.special) {
+    alert('Password must meet all requirements');
+    return;
+  }
+  
+  try {
+    // Get employee data from the row
+    const row = document.querySelector(`.employee-row[data-id="${employeeId}"]`);
+    const name = row.cells[1].innerText;
+    const mda = row.cells[2].innerText === 'N/A' ? '' : row.cells[2].innerText;
+    const email = document.getElementById('create_user_email').value;
+    const phone = row.cells[4].innerText === 'N/A' ? '' : row.cells[4].innerText;
+    
+    const formData = new URLSearchParams();
+    formData.append('user_action', 'create');
+    formData.append('new_password', password);
+    formData.append('confirm_password', confirm);
+    formData.append('name', name);
+    formData.append('mda', mda);
+    formData.append('email', email);
+    formData.append('phone', phone);
+    formData.append('role', 'employee');
+    
+    const response = await fetch(`/employees/edit/${employeeId}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body: formData
+    });
+    
+    if (response.redirected) {
+      window.location.href = response.url;
+    } else {
+      const result = await response.text();
+      createUserModal.hide();
+      location.reload();
+    }
+  } catch (error) {
+    alert('Error creating user account: ' + error.message);
+  }
 }
 
 async function showEmployeeReceipt(id, employeeId) {
@@ -256,10 +539,10 @@ async function showEmployeeReceipt(id, employeeId) {
         const cells = row.cells;
         
         // Get image source
-        const imgElement = cells[6].querySelector('img');
+        const imgElement = cells[7].querySelector('img');
         
         // Extract face quality
-        const qualityElement = cells[7].querySelector('.progress-bar');
+        const qualityElement = cells[8].querySelector('.progress-bar');
         const qualityText = qualityElement ? qualityElement.innerText : 'N/A';
         
         // Get role badge text
@@ -268,8 +551,9 @@ async function showEmployeeReceipt(id, employeeId) {
         
         // Get role color
         let roleColor = '#0d6efd'; // default blue
-        if (roleText.includes('Super Admin')) roleColor = '#8e44ad';
-        else if (roleText.includes('Admin')) roleColor = '#dc3545';
+        if (roleText.includes('Director')) roleColor = '#8e44ad';
+        else if (roleText.includes('Manager')) roleColor = '#dc3545';
+        else if (roleText.includes('Supervisor')) roleColor = '#ffc107';
         
         const data = {
             id: id,
@@ -434,12 +718,8 @@ function shareEmployeePDF(platform) {
         const url = URL.createObjectURL(blob);
         
         if (platform === 'whatsapp') {
-            // For WhatsApp, we can share a link to download
             const shareText = `📄 Employee ID Card for ${currentEmployeeData.name}\nDownload PDF: ${window.location.origin}/download_temp?file=${filename}`;
             window.open(`https://wa.me/?text=${encodeURIComponent(shareText)}`, '_blank');
-            
-            // You would need a server endpoint to serve the temp file
-            // For now, we'll just download and instruct user to share manually
             alert('PDF generated. Please download and share via WhatsApp manually.');
             downloadEmployeePDF();
             
@@ -450,7 +730,6 @@ function shareEmployeePDF(platform) {
             downloadEmployeePDF();
             
         } else if (platform === 'email') {
-            // Create mailto link with subject and body
             const subject = `Employee ID Card: ${currentEmployeeData.name}`;
             const body = `Please find attached the employee ID card for ${currentEmployeeData.name}.\n\nEmployee ID: ${currentEmployeeData.employeeid}\nMDA: ${currentEmployeeData.mda}`;
             window.location.href = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
@@ -488,6 +767,42 @@ async function deleteEmp(id, name) {
     btn.innerHTML = originalText;
   }
 }
+
+// New restore function
+async function restoreEmp(id, name) {
+  if (!confirm(`Restore employee ${name}?`)) return;
+  
+  try {
+    const res = await fetch('/employees/restore/' + id, { method: 'POST' });
+    const j = await res.json();
+    
+    if (j.status === 'ok') {
+      location.reload();
+    } else {
+      alert(j.msg || 'Error occurred');
+    }
+  } catch (err) {
+    alert('Network error');
+  }
+}
+
+// New permanent delete function
+async function permanentDeleteEmp(id, name) {
+  if (!confirm(`⚠️ PERMANENTLY DELETE ${name}?\nThis action cannot be undone!`)) return;
+  
+  try {
+    const res = await fetch('/employees/permanent_delete/' + id, { method: 'POST' });
+    const j = await res.json();
+    
+    if (j.status === 'ok') {
+      location.reload();
+    } else {
+      alert(j.msg || 'Error occurred');
+    }
+  } catch (err) {
+    alert('Network error');
+  }
+}
 </script>
 
 <style>
@@ -500,6 +815,9 @@ async function deleteEmp(id, name) {
 .employee-row:hover {
   background-color: rgba(13, 110, 253, 0.1) !important;
   transition: background-color 0.2s;
+}
+.employee-row.table-secondary:hover {
+  background-color: rgba(108, 117, 125, 0.2) !important;
 }
 .btn-group {
   gap: 2px;
@@ -535,6 +853,19 @@ img:hover {
 }
 .modal-lg {
   max-width: 700px;
+}
+.password-requirements {
+  background-color: #f8f9fa;
+  border-radius: 8px;
+  padding: 10px;
+  font-size: 0.9rem;
+}
+.password-requirements li {
+  transition: all 0.3s;
+}
+.text-success i, .text-danger i {
+  margin-right: 8px;
+  width: 16px;
 }
 </style>
 {% endblock %}

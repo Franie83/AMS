@@ -33,18 +33,21 @@
                         <select class="form-select" name="role" required>
                             <option value="user" {% if user.role == 'user' %}selected{% endif %}>User</option>
                             <option value="admin" {% if user.role == 'admin' %}selected{% endif %}>Admin</option>
+                            <option value="mda_user" {% if user.role == 'mda_user' %}selected{% endif %}>MDA User</option>
+                            <option value="superadmin" {% if user.role == 'superadmin' %}selected{% endif %}>Super Admin</option>
                         </select>
                     </div>
                     
-                    <div class="mb-3">
+                    <div class="mb-4">  <!-- Changed from mb-3 to mb-4 for more space -->
                         <label class="form-label">New Password (leave blank to keep current)</label>
                         <input type="password" class="form-control" name="password">
-                        <small class="text-muted">Enter only if you want to change the password</small>
+                        <small class="text-muted d-block mt-2">Enter only if you want to change the password</small>
+                        <!-- Added d-block mt-2 for proper spacing -->
                     </div>
                     
-                    <hr>
+                    <hr class="mt-4 mb-4">  <!-- Added more margin top and bottom -->
                     
-                    <div class="d-flex gap-2">
+                    <div class="d-flex gap-2 mt-3">  <!-- Added mt-3 for top margin -->
                         <button type="submit" class="btn btn-primary">💾 Save Changes</button>
                         <a href="{{ url_for('admin_users') }}" class="btn btn-secondary">Cancel</a>
                     </div>
@@ -53,4 +56,28 @@
         </div>
     </div>
 </div>
+
+<!-- Add bottom padding to the container -->
+<style>
+.row.justify-content-center {
+    margin-bottom: 50px;
+    padding-bottom: 30px;
+}
+/* Ensure proper spacing in the form */
+.mb-4 {
+    margin-bottom: 1.5rem !important;
+}
+.mt-4 {
+    margin-top: 1.5rem !important;
+}
+.mt-3 {
+    margin-top: 1rem !important;
+}
+.mt-2 {
+    margin-top: 0.5rem !important;
+}
+.d-block {
+    display: block !important;
+}
+</style>
 {% endblock %}

@@ -1,41 +1,63 @@
 {% extends "layout.html" %}
 {% block body %}
-<div class="container-fluid mt-4">
-    <div class="d-flex justify-content-between align-items-center mb-3">
-        <h3>👥 User Management (Admin)</h3>
-        <div>
+<div class="container-fluid">
+    <div class="row mb-4">
+        <div class="col">
+            <h2>👥 User Management</h2>
+            <p class="text-muted">Manage system users and their roles</p>
+        </div>
+        <div class="col text-end">
             <a href="{{ url_for('admin_add_user') }}" class="btn btn-success">
-                <i class="fas fa-user-plus"></i> Add New User
+                <i class="fas fa-user-plus me-2"></i>Add New User
             </a>
         </div>
     </div>
-    
-    <!-- Search Bar -->
-    <div class="card mb-4">
-        <div class="card-body">
-            <form method="get" class="row g-3">
-                <div class="col-md-10">
-                    <input type="text" class="form-control" name="search" placeholder="Search by name, email, or MDA..." value="{{ search }}">
-                </div>
-                <div class="col-md-2">
-                    <button type="submit" class="btn btn-primary w-100">🔍 Search</button>
-                </div>
+
+    <!-- Search -->
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <form method="get" class="d-flex">
+                <input type="text" name="search" class="form-control me-2" placeholder="Search by name, email, or MDA..." value="{{ search }}">
+                <button type="submit" class="btn btn-primary">
+                    <i class="fas fa-search me-2"></i>Search
+                </button>
+                {% if search %}
+                <a href="{{ url_for('admin_users') }}" class="btn btn-secondary ms-2">
+                    <i class="fas fa-times me-2"></i>Clear
+                </a>
+                {% endif %}
             </form>
         </div>
     </div>
-    
-    <!-- Users Table -->
-    <div class="card">
-        <div class="card-header bg-light d-flex justify-content-between align-items-center">
-            <h5 class="mb-0">System Users</h5>
-            <span class="badge bg-primary">Total: {{ users.total }}</span>
+
+    <!-- Stats -->
+    <div class="row mb-4">
+        <div class="col">
+            <div class="card bg-light">
+                <div class="card-body py-2">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <span><strong>Total Users:</strong> {{ users.total }}</span>
+                        <span class="text-primary"><strong>Super Admins:</strong> {{ users.items|selectattr('role', 'equalto', 'superadmin')|list|length }}</span>
+                        <span class="text-danger"><strong>Admins:</strong> {{ users.items|selectattr('role', 'equalto', 'admin')|list|length }}</span>
+                        <span class="text-info"><strong>MDA Users:</strong> {{ users.items|selectattr('role', 'equalto', 'mda_user')|list|length }}</span>
+                        <span class="text-success"><strong>Regular Users:</strong> {{ users.items|selectattr('role', 'equalto', 'user')|list|length }}</span>
+                    </div>
+                </div>
+            </div>
         </div>
-        <div class="card-body">
+    </div>
+
+    <!-- Users Table -->
+    <div class="card shadow">
+        <div class="card-header bg-primary text-white">
+            <h5 class="mb-0">System Users</h5>
+        </div>
+        <div class="card-body p-0">
             <div class="table-responsive">
-                <table class="table table-hover">
+                <table class="table table-hover mb-0">
                     <thead class="table-dark">
                         <tr>
-                            <th>ID</th>
+                            <!-- ID column removed -->
                             <th>Name</th>
                             <th>Email</th>
                             <th>Phone</th>
@@ -46,35 +68,44 @@
                         </tr>
                     </thead>
                     <tbody>
-                        {% for user in users.items %}
+                        {% for u in users.items %}
                         <tr>
-                            <td>{{ user.id }}</td>
-                            <td><strong>{{ user.name }}</strong></td>
-                            <td>{{ user.email }}</td>
-                            <td>{{ user.phone or 'N/A' }}</td>
-                            <td>{{ user.mda or 'N/A' }}</td>
+                            <!-- ID cell removed - data is still available via u.id in actions -->
+                            <td>{{ u.name }}</td>
+                            <td>{{ u.email }}</td>
+                            <td>{{ u.phone or 'N/A' }}</td>
+                            <td>{{ u.mda or 'N/A' }}</td>
                             <td>
-                                {% if user.role == 'admin' %}
-                                <span class="badge bg-danger">Admin</span>
+                                {% if u.role == 'superadmin' %}
+                                    <span class="badge" style="background-color: #8e44ad;">👑 Super Admin</span>
+                                {% elif u.role == 'admin' %}
+                                    <span class="badge bg-danger">🛡️ Admin</span>
+                                {% elif u.role == 'mda_user' %}
+                                    <span class="badge bg-info">🏢 MDA User</span>
                                 {% else %}
-                                <span class="badge bg-primary">User</span>
+                                    <span class="badge bg-primary">👤 User</span>
                                 {% endif %}
                             </td>
-                            <td>{{ user.created_at.strftime('%Y-%m-%d') if user.created_at else 'N/A' }}</td>
+                            <td>{{ u.created_at.strftime('%Y-%m-%d') if u.created_at else 'N/A' }}</td>
                             <td>
                                 <div class="btn-group btn-group-sm" role="group">
-                                    <a href="{{ url_for('admin_edit_user', id=user.id) }}" class="btn btn-outline-primary" title="Edit">
+                                    <a href="{{ url_for('admin_edit_user', id=u.id) }}" class="btn btn-primary" title="Edit">
                                         <i class="fas fa-edit"></i>
                                     </a>
-                                    {% if user.id != current_user.id %}
-                                    <button class="btn btn-outline-danger" onclick="deleteUser({{ user.id }}, '{{ user.name }}')" title="Delete">
-                                        <i class="fas fa-trash"></i>
-                                    </button>
-                                    {% else %}
-                                    <button class="btn btn-outline-secondary" disabled title="Cannot delete yourself">
+                                    {% if u.id != current_user.id %}
+                                    <button type="button" class="btn btn-danger" onclick="deleteUser({{ u.id }}, '{{ u.name }}')" title="Delete">
                                         <i class="fas fa-trash"></i>
                                     </button>
                                     {% endif %}
+                                </div>
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="7" class="text-center py-4">  <!-- Changed from colspan="8" to colspan="7" -->
+                                <div class="text-muted">
+                                    <i class="fas fa-users fa-3x mb-3"></i>
+                                    <p>No users found</p>
                                 </div>
                             </td>
                         </tr>
@@ -82,36 +113,26 @@
                     </tbody>
                 </table>
             </div>
-            
-            <!-- Pagination -->
-            {% if users.pages > 1 %}
+        </div>
+        
+        <!-- Pagination -->
+        {% if users.pages > 1 %}
+        <div class="card-footer">
             <nav aria-label="User pagination">
-                <ul class="pagination justify-content-center">
+                <ul class="pagination justify-content-center mb-0">
                     {% if users.has_prev %}
                     <li class="page-item">
                         <a class="page-link" href="{{ url_for('admin_users', page=users.prev_num, search=search) }}">Previous</a>
                     </li>
-                    {% else %}
-                    <li class="page-item disabled">
-                        <span class="page-link">Previous</span>
-                    </li>
                     {% endif %}
                     
-                    {% for page_num in users.iter_pages(left_edge=1, right_edge=1, left_current=2, right_current=2) %}
+                    {% for page_num in users.iter_pages() %}
                         {% if page_num %}
-                            {% if page_num == users.page %}
-                            <li class="page-item active">
-                                <span class="page-link">{{ page_num }}</span>
-                            </li>
-                            {% else %}
-                            <li class="page-item">
+                            <li class="page-item {% if page_num == users.page %}active{% endif %}">
                                 <a class="page-link" href="{{ url_for('admin_users', page=page_num, search=search) }}">{{ page_num }}</a>
                             </li>
-                            {% endif %}
                         {% else %}
-                            <li class="page-item disabled">
-                                <span class="page-link">...</span>
-                            </li>
+                            <li class="page-item disabled"><span class="page-link">...</span></li>
                         {% endif %}
                     {% endfor %}
                     
@@ -119,29 +140,27 @@
                     <li class="page-item">
                         <a class="page-link" href="{{ url_for('admin_users', page=users.next_num, search=search) }}">Next</a>
                     </li>
-                    {% else %}
-                    <li class="page-item disabled">
-                        <span class="page-link">Next</span>
-                    </li>
                     {% endif %}
                 </ul>
             </nav>
-            {% endif %}
         </div>
+        {% endif %}
     </div>
 </div>
 
 <!-- Delete Confirmation Modal -->
-<div class="modal fade" id="deleteModal" tabindex="-1">
+<div class="modal fade" id="deleteUserModal" tabindex="-1">
     <div class="modal-dialog">
         <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title text-danger">Confirm Delete</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title">
+                    <i class="fas fa-exclamation-triangle me-2"></i>Confirm Delete
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
                 <p>Are you sure you want to delete user <strong id="deleteUserName"></strong>?</p>
-                <p class="text-muted small">This action cannot be undone.</p>
+                <p class="text-danger"><small>This action cannot be undone.</small></p>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
@@ -153,43 +172,54 @@
 
 <script>
 let deleteModal;
-let currentUserId = null;
+let deleteUserId = null;
 
 document.addEventListener('DOMContentLoaded', function() {
-    deleteModal = new bootstrap.Modal(document.getElementById('deleteModal'));
+    deleteModal = new bootstrap.Modal(document.getElementById('deleteUserModal'));
 });
 
 function deleteUser(id, name) {
-    currentUserId = id;
+    deleteUserId = id;
     document.getElementById('deleteUserName').textContent = name;
     deleteModal.show();
-}
-
-document.getElementById('confirmDeleteBtn').addEventListener('click', function() {
-    if (!currentUserId) return;
     
-    fetch(`/admin/users/delete/${currentUserId}`, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json'
-        }
-    })
-    .then(response => response.json())
-    .then(data => {
-        if (data.status === 'ok') {
-            alert(data.msg);
-            window.location.reload();
-        } else {
-            alert('Error: ' + data.msg);
-        }
-    })
-    .catch(error => {
-        alert('Network error: ' + error);
-    })
-    .finally(() => {
-        deleteModal.hide();
-        currentUserId = null;
-    });
-});
+    document.getElementById('confirmDeleteBtn').onclick = function() {
+        fetch('/admin/users/delete/' + deleteUserId, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'ok') {
+                location.reload();
+            } else {
+                alert('Error: ' + data.msg);
+                deleteModal.hide();
+            }
+        })
+        .catch(error => {
+            alert('Network error: ' + error);
+            deleteModal.hide();
+        });
+    };
+}
 </script>
+
+<style>
+.table td {
+    vertical-align: middle;
+}
+.btn-group {
+    gap: 2px;
+}
+.badge {
+    font-size: 0.8rem;
+    padding: 0.4rem 0.6rem;
+}
+.pagination {
+    margin-bottom: 0;
+}
+</style>
 {% endblock %}

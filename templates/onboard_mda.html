@@ -1,0 +1,251 @@
+{% extends "layout.html" %}
+{% block body %}
+<div class="container mt-5">
+    <div class="row justify-content-center">
+        <div class="col-md-6">
+            <div class="card shadow-lg border-0 rounded-lg">
+                <div class="card-header bg-gradient-primary text-white py-3">
+                    <h4 class="mb-0">
+                        <i class="fas fa-building me-2"></i>Onboard MDA User
+                    </h4>
+                    <p class="mb-0 mt-2 text-white-50">Create a department administrator account</p>
+                </div>
+                
+                <div class="card-body p-4">
+                    {% with messages = get_flashed_messages(with_categories=true) %}
+                        {% if messages %}
+                            {% for category, message in messages %}
+                                <div class="alert alert-{{ 'danger' if category == 'error' else category }} alert-dismissible fade show" role="alert">
+                                    <i class="fas fa-{% if category == 'success' %}check-circle{% elif category == 'danger' %}exclamation-circle{% else %}info-circle{% endif %} me-2"></i>
+                                    {{ message }}
+                                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                                </div>
+                            {% endfor %}
+                        {% endif %}
+                    {% endwith %}
+
+                    <div class="alert alert-info d-flex align-items-center">
+                        <i class="fas fa-info-circle fa-2x me-3"></i>
+                        <div>
+                            <strong>Login credentials:</strong><br>
+                            <span class="badge bg-primary">Username: Email</span>
+                            <span class="badge bg-secondary">Password: Phone number</span>
+                        </div>
+                    </div>
+
+                    <form method="POST" id="mdaForm">
+                        <div class="mb-3">
+                            <label for="name" class="form-label fw-bold">
+                                <i class="fas fa-user me-2 text-primary"></i>Full Name
+                            </label>
+                            <input type="text" class="form-control form-control-lg" id="name" name="name" 
+                                   placeholder="Enter full name" required autofocus>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="email" class="form-label fw-bold">
+                                <i class="fas fa-envelope me-2 text-primary"></i>Email Address
+                            </label>
+                            <input type="email" class="form-control form-control-lg" id="email" name="email" 
+                                   placeholder="Enter email address" required>
+                            <small class="text-muted">
+                                <i class="fas fa-info-circle me-1"></i>Will be used as username for login
+                            </small>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="phone" class="form-label fw-bold">
+                                <i class="fas fa-phone me-2 text-primary"></i>Phone Number
+                            </label>
+                            <input type="tel" class="form-control form-control-lg" id="phone" name="phone" 
+                                   placeholder="Enter phone number" required>
+                            <small class="text-muted">
+                                <i class="fas fa-info-circle me-1"></i>Will be used as password for login
+                            </small>
+                        </div>
+                        
+                        <div class="mb-3">
+                            <label for="mda" class="form-label fw-bold">
+                                <i class="fas fa-building me-2 text-primary"></i>MDA/Department
+                            </label>
+                            <input type="text" class="form-control form-control-lg" id="mda" name="mda" 
+                                   placeholder="e.g., Health, Education, Finance" required>
+                            <small class="text-muted">
+                                <i class="fas fa-info-circle me-1"></i>The department this user will manage
+                            </small>
+                        </div>
+                        
+                        <div class="alert alert-warning d-flex align-items-center">
+                            <i class="fas fa-exclamation-triangle fa-2x me-3"></i>
+                            <div>
+                                <strong>Important:</strong><br>
+                                This user will log in using their email and phone number as password.
+                                They will be able to register and manage employees only in this MDA.
+                            </div>
+                        </div>
+                        
+                        <div class="d-grid gap-2">
+                            <button type="submit" class="btn btn-primary btn-lg" id="submitBtn">
+                                <i class="fas fa-user-plus me-2"></i>Create MDA User
+                            </button>
+                            
+                            <button type="button" class="btn btn-outline-secondary" onclick="generateSecurePassword()">
+                                <i class="fas fa-key me-2"></i>Generate Secure Password
+                            </button>
+                        </div>
+                    </form>
+                    
+                    <hr class="my-4">
+                    
+                    <div class="text-center">
+                        <a href="{{ url_for('login') }}" class="text-decoration-none">
+                            <i class="fas fa-arrow-left me-1"></i>Back to Login
+                        </a>
+                        <span class="mx-2 text-muted">|</span>
+                        <a href="{{ url_for('admin_users') }}" class="text-decoration-none">
+                            <i class="fas fa-users-cog me-1"></i>Manage Users
+                        </a>
+                    </div>
+                </div>
+                
+                <div class="card-footer bg-light py-3">
+                    <div class="small text-muted">
+                        <i class="fas fa-shield-alt me-1"></i>
+                        MDA users have restricted access to only their department's employees and data.
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Password Generator Modal -->
+<div class="modal fade" id="passwordModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title">
+                    <i class="fas fa-key me-2"></i>Generated Password
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body text-center">
+                <div class="display-6 mb-3" id="generatedPassword">Password123!</div>
+                <div class="alert alert-info">
+                    <i class="fas fa-info-circle me-2"></i>
+                    You can use this password or continue with phone number as password.
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-primary" onclick="useGeneratedPassword()">
+                    <i class="fas fa-check me-2"></i>Use This Password
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+let passwordModal;
+let generatedPwd = '';
+
+document.addEventListener('DOMContentLoaded', function() {
+    passwordModal = new bootstrap.Modal(document.getElementById('passwordModal'));
+    
+    // Form validation
+    document.getElementById('mdaForm').addEventListener('submit', function(e) {
+        const phone = document.getElementById('phone').value;
+        if (phone.length < 10) {
+            e.preventDefault();
+            alert('Phone number must be at least 10 digits');
+        }
+    });
+});
+
+function generateSecurePassword() {
+    const length = 12;
+    const uppercase = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+    const lowercase = 'abcdefghijklmnopqrstuvwxyz';
+    const numbers = '0123456789';
+    const special = '!@#$%^&*';
+    
+    let password = '';
+    password += uppercase[Math.floor(Math.random() * uppercase.length)];
+    password += lowercase[Math.floor(Math.random() * lowercase.length)];
+    password += numbers[Math.floor(Math.random() * numbers.length)];
+    password += special[Math.floor(Math.random() * special.length)];
+    
+    for (let i = password.length; i < length; i++) {
+        const allChars = uppercase + lowercase + numbers + special;
+        password += allChars[Math.floor(Math.random() * allChars.length)];
+    }
+    
+    // Shuffle password
+    password = password.split('').sort(() => Math.random() - 0.5).join('');
+    generatedPwd = password;
+    
+    document.getElementById('generatedPassword').textContent = password;
+    passwordModal.show();
+}
+
+function useGeneratedPassword() {
+    document.getElementById('phone').value = generatedPwd;
+    passwordModal.hide();
+    alert('✅ Password set! You can modify it if needed.');
+}
+</script>
+
+<style>
+.bg-gradient-primary {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+.text-white-50 {
+    color: rgba(255, 255, 255, 0.8) !important;
+}
+.card {
+    border-radius: 15px;
+}
+.card-header {
+    border-radius: 15px 15px 0 0 !important;
+}
+.form-control-lg {
+    border-radius: 10px;
+    border: 2px solid #e0e0e0;
+    transition: all 0.3s;
+}
+.form-control-lg:focus {
+    border-color: #667eea;
+    box-shadow: 0 0 0 0.2rem rgba(102, 126, 234, 0.25);
+}
+.btn-primary {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border: none;
+    border-radius: 10px;
+    font-weight: 600;
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+.btn-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+}
+.btn-outline-secondary {
+    border-radius: 10px;
+}
+.alert {
+    border-radius: 10px;
+    border-left: 4px solid;
+}
+.alert-info {
+    border-left-color: #17a2b8;
+}
+.alert-warning {
+    border-left-color: #ffc107;
+}
+.badge {
+    font-size: 0.9rem;
+    padding: 0.5rem 1rem;
+    margin-right: 0.5rem;
+}
+</style>
+{% endblock %}

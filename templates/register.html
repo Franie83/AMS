@@ -186,6 +186,7 @@
         .status-face { background: #d1ecf1; color: #0c5460; }
         .status-error { background: #f8d7da; color: #721c24; }
         .status-success { background: #d4edda; color: #155724; font-size: 18px; }
+        .status-warning { background: #fff3cd; color: #856404; }
         
         .quality-bar {
             width: 100%;
@@ -274,6 +275,18 @@
             text-align: center;
             font-size: 18px;
             border: 2px solid #28a745;
+            animation: slideIn 0.5s ease-out;
+        }
+        .warning-message {
+            color: #856404;
+            background: #fff3cd;
+            padding: 15px;
+            border-radius: 10px;
+            margin: 20px 0;
+            display: none;
+            text-align: center;
+            font-size: 16px;
+            border: 2px solid #ffc107;
             animation: slideIn 0.5s ease-out;
         }
         .employee-id-container {
@@ -466,6 +479,88 @@
             10%, 30%, 50%, 70%, 90% { transform: translateX(-5px); }
             20%, 40%, 60%, 80% { transform: translateX(5px); }
         }
+        /* Reactivation warning */
+        .reactivation-warning {
+            background: #ffc107;
+            color: #856404;
+            padding: 12px;
+            border-radius: 8px;
+            margin: 10px 0;
+            text-align: center;
+            font-weight: bold;
+            border-left: 4px solid #856404;
+        }
+        /* Camera tips */
+        .camera-tips {
+            margin-top: 10px;
+            font-size: 14px;
+            color: #6c757d;
+            text-align: center;
+            background: #f8f9fa;
+            padding: 10px;
+            border-radius: 8px;
+        }
+        .camera-tips ul {
+            text-align: left;
+            margin-top: 5px;
+            padding-left: 20px;
+        }
+        /* Stability Indicator */
+        .stability-indicator {
+            display: flex;
+            justify-content: center;
+            gap: 8px;
+            margin: 10px 0;
+        }
+        .stability-bar {
+            width: 40px;
+            height: 8px;
+            background: #ddd;
+            border-radius: 4px;
+            transition: background 0.3s ease;
+        }
+        .stability-bar.active-1 {
+            background: #ffc107;
+        }
+        .stability-bar.active-2 {
+            background: #ffc107;
+        }
+        .stability-bar.active-3 {
+            background: #28a745;
+        }
+        .stability-text {
+            font-size: 12px;
+            color: #6c757d;
+            text-align: center;
+            margin-top: 5px;
+        }
+        /* Debug panel */
+        .debug-panel {
+            margin-top: 15px;
+            padding: 10px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            display: none;
+            border: 2px solid #17a2b8;
+        }
+        .debug-panel h6 {
+            margin-bottom: 10px;
+            color: #17a2b8;
+        }
+        #debugInfo {
+            font-size: 12px;
+            background: white;
+            padding: 8px;
+            border-radius: 5px;
+            border: 1px solid #dee2e6;
+        }
+        #debugCanvas {
+            width: 100%;
+            margin-top: 10px;
+            display: none;
+            border: 2px solid #17a2b8;
+            border-radius: 5px;
+        }
     </style>
 </head>
 <body>
@@ -497,10 +592,15 @@
         </div>
         
         <div id="duplicateWarning" class="duplicate-warning" style="display: none;">
-            ⚠️ This face image already exists in the system!
+            ⚠️ This face image already exists for an ACTIVE employee!
+        </div>
+        
+        <div id="reactivationWarning" class="reactivation-warning" style="display: none;">
+            🔄 This face belongs to an INACTIVE employee. Registration will reactivate them.
         </div>
         
         <div id="errorMessage" class="error-message"></div>
+        <div id="warningMessage" class="warning-message"></div>
         <div id="successMessage" class="success-message"></div>
         
         <div id="registrationComplete" style="display: none;">
@@ -574,11 +674,32 @@
                         </div>
                     </div>
                     
+                    <!-- Camera Tips -->
+                    <div class="camera-tips">
+                        <i class="fas fa-lightbulb me-1"></i> Tips for best results:
+                        <ul>
+                            <li>Ensure good, even lighting on your face</li>
+                            <li>Position your face fully within the oval guide</li>
+                            <li>Remove glasses if they cause glare</li>
+                            <li>Look directly at the camera and hold still</li>
+                        </ul>
+                    </div>
+                    
                     <!-- Quality Indicator -->
                     <div class="quality-bar" id="qualityBar" style="display: none;">
                         <div class="quality-fill" id="qualityFill" style="width: 0%"></div>
                     </div>
                     <div class="quality-text" id="qualityText"></div>
+                    
+                    <!-- Stability Indicator -->
+                    <div id="stabilityIndicator" style="display: none;">
+                        <div class="stability-indicator">
+                            <div class="stability-bar" id="stabilityBar1"></div>
+                            <div class="stability-bar" id="stabilityBar2"></div>
+                            <div class="stability-bar" id="stabilityBar3"></div>
+                        </div>
+                        <div class="stability-text" id="stabilityText">Hold still...</div>
+                    </div>
                     
                     <!-- Hidden canvas for cropping -->
                     <canvas id="cropCanvas" style="display:none;"></canvas>
@@ -587,14 +708,27 @@
                     <!-- Cropped Preview -->
                     <img id="croppedPreview" class="cropped-preview" alt="Cropped Face">
                     
+                    <!-- Debug Panel -->
+                    <div class="debug-panel" id="debugPanel">
+                        <h6>🔧 Debug Info</h6>
+                        <div id="debugInfo"></div>
+                        <button type="button" class="btn btn-sm btn-warning mt-2" onclick="captureDebugImage()">
+                            📸 Capture Debug Image
+                        </button>
+                        <canvas id="debugCanvas"></canvas>
+                    </div>
+                    
                     <!-- Manual Capture Button -->
                     <button type="button" class="btn btn-capture" id="captureBtn" disabled onclick="manualCapture()">
-                        <i class="fas fa-camera-retro me-2"></i>📸 CLICK TO CAPTURE FACE ONLY
+                        <i class="fas fa-camera-retro me-2"></i>📸 HOLD STILL & CAPTURE
                     </button>
                     
                     <div class="button-group">
                         <button type="button" class="btn btn-secondary" id="cancelCameraBtn" onclick="cancelCamera()">
                             ❌ Cancel
+                        </button>
+                        <button type="button" class="btn btn-info" id="debugToggleBtn" onclick="toggleDebug()">
+                            🔧 Debug
                         </button>
                     </div>
                 </div>
@@ -628,6 +762,7 @@
             // Clear any existing messages
             document.getElementById('errorMessage').style.display = 'none';
             document.getElementById('successMessage').style.display = 'none';
+            document.getElementById('warningMessage').style.display = 'none';
             
             // Initial validation check
             updateValidationStatus();
@@ -637,12 +772,20 @@
         let isProcessing = false;
         let lastDetectionTime = 0;
         let faceDetected = false;
+        let stableFrames = 0;
+        let lastStableState = false;
         let hasCaptured = false;
         let isSubmitting = false;
         let cameraActive = false;
         let faceFrame = null;
         let capturedImageData = null;
-        const DETECTION_THROTTLE_MS = 300;
+        let debugMode = false;
+        let noFaceTimer = null;
+        let isDuplicateFace = false;
+        let isInactiveDuplicate = false;
+        
+        const DETECTION_THROTTLE_MS = 500; // Increased to 500ms for stability
+        const REQUIRED_STABLE_FRAMES = 3; // Need 3 consecutive frames
         const FRAME_WIDTH = 132;
         const FRAME_HEIGHT = 168;
 
@@ -659,6 +802,7 @@
         const qualityFill = document.getElementById('qualityFill');
         const qualityText = document.getElementById('qualityText');
         const errorMessage = document.getElementById('errorMessage');
+        const warningMessage = document.getElementById('warningMessage');
         const successMessage = document.getElementById('successMessage');
         const registrationComplete = document.getElementById('registrationComplete');
         const formFields = document.getElementById('formFields');
@@ -676,9 +820,43 @@
         const validationStatus = document.getElementById('validationStatus');
         const statusText = document.getElementById('statusText');
         const duplicateWarning = document.getElementById('duplicateWarning');
+        const reactivationWarning = document.getElementById('reactivationWarning');
+        const debugPanel = document.getElementById('debugPanel');
+        const debugInfo = document.getElementById('debugInfo');
+        const debugCanvas = document.getElementById('debugCanvas');
+        
+        // Stability indicator elements
+        const stabilityIndicator = document.getElementById('stabilityIndicator');
+        const stabilityBar1 = document.getElementById('stabilityBar1');
+        const stabilityBar2 = document.getElementById('stabilityBar2');
+        const stabilityBar3 = document.getElementById('stabilityBar3');
+        const stabilityText = document.getElementById('stabilityText');
+
+        function updateStabilityIndicator(frames) {
+            if (frames > 0) {
+                stabilityIndicator.style.display = 'block';
+                
+                // Update bars
+                stabilityBar1.className = 'stability-bar' + (frames >= 1 ? ' active-1' : '');
+                stabilityBar2.className = 'stability-bar' + (frames >= 2 ? ' active-2' : '');
+                stabilityBar3.className = 'stability-bar' + (frames >= 3 ? ' active-3' : '');
+                
+                // Update text
+                if (frames >= REQUIRED_STABLE_FRAMES) {
+                    stabilityText.textContent = '✅ Stable! Click capture';
+                    stabilityText.style.color = '#28a745';
+                } else {
+                    stabilityText.textContent = `Hold still... ${frames}/${REQUIRED_STABLE_FRAMES}`;
+                    stabilityText.style.color = '#ffc107';
+                }
+            } else {
+                stabilityIndicator.style.display = 'none';
+            }
+        }
 
         function showError(message, field = null) {
             successMessage.style.display = 'none';
+            warningMessage.style.display = 'none';
             registrationComplete.style.display = 'none';
             
             errorMessage.textContent = '❌ ' + message;
@@ -697,8 +875,21 @@
             }, 5000);
         }
 
+        function showWarning(message) {
+            errorMessage.style.display = 'none';
+            successMessage.style.display = 'none';
+            
+            warningMessage.textContent = '⚠️ ' + message;
+            warningMessage.style.display = 'block';
+            
+            setTimeout(() => {
+                warningMessage.style.display = 'none';
+            }, 5000);
+        }
+
         function showSuccess(message) {
             errorMessage.style.display = 'none';
+            warningMessage.style.display = 'none';
             registrationComplete.style.display = 'none';
             
             successMessage.textContent = '✅ ' + message;
@@ -746,6 +937,7 @@
         function showRegistrationComplete(employeeId, name, email, mda, phone) {
             errorMessage.style.display = 'none';
             successMessage.style.display = 'none';
+            warningMessage.style.display = 'none';
             
             displayEmployeeId.textContent = employeeId;
             
@@ -785,6 +977,59 @@
             registerStatus.className = `status-${className}`;
         }
 
+        function toggleDebug() {
+            debugMode = !debugMode;
+            debugPanel.style.display = debugMode ? 'block' : 'none';
+        }
+
+        function captureDebugImage() {
+            if (!registerVideo || !registerVideo.videoWidth) {
+                alert('Camera not active');
+                return;
+            }
+            
+            const canvas = document.createElement('canvas');
+            canvas.width = registerVideo.videoWidth;
+            canvas.height = registerVideo.videoHeight;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(registerVideo, 0, 0);
+            
+            // Display the captured frame
+            debugCanvas.width = canvas.width;
+            debugCanvas.height = canvas.height;
+            debugCanvas.getContext('2d').drawImage(canvas, 0, 0);
+            debugCanvas.style.display = 'block';
+            
+            // Send to server for analysis
+            const imageData = canvas.toDataURL('image/jpeg', 0.9);
+            
+            debugInfo.innerHTML = `
+                <div>📊 Image size: ${canvas.width} x ${canvas.height}</div>
+                <div>⏳ Analyzing...</div>
+            `;
+            
+            fetch('/detect_face', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({image: imageData})
+            })
+            .then(response => response.json())
+            .then(result => {
+                debugInfo.innerHTML = `
+                    <div>📊 Image size: ${canvas.width} x ${canvas.height}</div>
+                    <div>🔍 Face detected: ${result.face_detected ? '✅ YES' : '❌ NO'}</div>
+                    <div>📈 Quality: ${result.quality ? Math.round(result.quality * 100) + '%' : 'N/A'}</div>
+                    <div>👁️ Liveness passed: ${result.liveness_passed ? '✅' : '❌'}</div>
+                    <div>💬 Message: ${result.message}</div>
+                `;
+            })
+            .catch(error => {
+                debugInfo.innerHTML = `
+                    <div class="text-danger">Error: ${error.message}</div>
+                `;
+            });
+        }
+
         // Watch form fields for validation only (no auto camera)
         const inputs = document.querySelectorAll('#registerForm input, #registerForm select');
         inputs.forEach(input => {
@@ -815,6 +1060,17 @@
                 });
                 
                 const result = await response.json();
+                
+                // Update debug info if debug mode is on
+                if (debugMode) {
+                    debugInfo.innerHTML = `
+                        <div>📊 Image size: ${canvas.width} x ${canvas.height}</div>
+                        <div>🔍 Face detected: ${result.face_detected ? '✅ YES' : '❌ NO'}</div>
+                        <div>📈 Quality: ${result.quality ? Math.round(result.quality * 100) + '%' : 'N/A'}</div>
+                        <div>👁️ Liveness: ${result.liveness_passed ? '✅' : '❌'}</div>
+                    `;
+                }
+                
                 return result;
             } catch (error) {
                 console.error('Face detection API error:', error);
@@ -841,11 +1097,19 @@
         function startRegisterCamera() {
             if (hasCaptured || isSubmitting || cameraActive) return;
             
+            // Reset stability
+            stableFrames = 0;
+            lastStableState = false;
+            
+            // Clear any existing timer
+            if (noFaceTimer) clearTimeout(noFaceTimer);
+            
             cameraActive = true;
             startCameraBtn.style.display = 'none';
             validationStatus.style.display = 'none';
             registerCameraSection.style.display = 'block';
             duplicateWarning.style.display = 'none';
+            reactivationWarning.style.display = 'none';
             updateStatus("Camera starting...", 'active');
             
             navigator.mediaDevices.getUserMedia({ 
@@ -861,6 +1125,13 @@
                 registerVideo.onloadedmetadata = () => {
                     updateStatus("Camera ready! Position your face in the frame", 'active');
                     startFaceDetection();
+                    
+                    // Set timeout for no face detection
+                    noFaceTimer = setTimeout(() => {
+                        if (!lastStableState && cameraActive) {
+                            showWarning("Still no stable face detected. Please check lighting and hold still.");
+                        }
+                    }, 10000);
                 };
             })
             .catch(err => {
@@ -880,26 +1151,56 @@
                 const result = await detectFaceWithAPI();
                 
                 if (result && result.face_detected && !isProcessing && !hasCaptured && !isSubmitting) {
-                    faceDetected = true;
-                    qualityBar.style.display = 'block';
-                    qualityFill.style.width = `${result.quality * 100}%`;
-                    qualityText.textContent = `Face quality: ${Math.round(result.quality * 100)}%`;
+                    // Face detected - increment stable counter
+                    stableFrames = Math.min(stableFrames + 1, REQUIRED_STABLE_FRAMES);
+                    updateStabilityIndicator(stableFrames);
                     
-                    faceGuide.classList.add('face-detected');
-                    faceGuideLabel.textContent = '✅ Face detected!';
-                    
-                    // Enable capture button
-                    captureBtn.disabled = false;
-                    updateStatus("Face detected! Click CAPTURE button", 'face');
+                    if (stableFrames >= REQUIRED_STABLE_FRAMES && !lastStableState) {
+                        // Stable detection achieved
+                        lastStableState = true;
+                        
+                        qualityBar.style.display = 'block';
+                        qualityFill.style.width = `${result.quality * 100}%`;
+                        qualityText.textContent = `Face quality: ${Math.round(result.quality * 100)}%`;
+                        
+                        faceGuide.classList.add('face-detected');
+                        faceGuideLabel.textContent = '✅ Face stable! Click CAPTURE';
+                        
+                        // Enable capture button
+                        captureBtn.disabled = false;
+                        updateStatus("Face stable! Click CAPTURE button now", 'face');
+                        
+                        // Clear no face timer
+                        if (noFaceTimer) {
+                            clearTimeout(noFaceTimer);
+                            noFaceTimer = null;
+                        }
+                    }
                 } else {
-                    faceDetected = false;
-                    qualityBar.style.display = 'none';
-                    qualityText.textContent = '';
-                    faceGuide.classList.remove('face-detected');
-                    faceGuideLabel.textContent = 'Position face here';
+                    // No face detected - decrement stable counter
+                    if (stableFrames > 0) {
+                        stableFrames = Math.max(stableFrames - 1, 0);
+                        updateStabilityIndicator(stableFrames);
+                    }
                     
-                    // Disable capture button
-                    captureBtn.disabled = true;
+                    if (stableFrames === 0 && lastStableState) {
+                        // Stable detection lost
+                        lastStableState = false;
+                        
+                        qualityBar.style.display = 'none';
+                        qualityText.textContent = '';
+                        faceGuide.classList.remove('face-detected');
+                        
+                        if (registerVideo.videoWidth > 0) {
+                            faceGuideLabel.textContent = '❌ Hold still - stabilizing...';
+                            updateStatus("Please hold still - stabilizing face detection", 'error');
+                        } else {
+                            faceGuideLabel.textContent = 'Position face here';
+                        }
+                        
+                        // Disable capture button
+                        captureBtn.disabled = true;
+                    }
                 }
                 
                 requestAnimationFrame(detectFaces);
@@ -926,7 +1227,7 @@
             const guideHeight = guideRect.height * scaleY;
             
             // Set crop canvas size to frame dimensions
-            cropCanvas.width = FRAME_WIDTH * 2; // Double size for better quality
+            cropCanvas.width = FRAME_WIDTH * 2;
             cropCanvas.height = FRAME_HEIGHT * 2;
             
             // Draw the cropped face
@@ -941,9 +1242,15 @@
         }
 
         async function manualCapture() {
-            if (isProcessing || hasCaptured || isSubmitting || !faceDetected) return;
+            if (isProcessing || hasCaptured || isSubmitting || !lastStableState) return;
             
             isProcessing = true;
+            
+            // Clear no face timer
+            if (noFaceTimer) {
+                clearTimeout(noFaceTimer);
+                noFaceTimer = null;
+            }
             
             // Flash effect
             registerVideo.classList.add('flash-message');
@@ -957,22 +1264,35 @@
             const duplicateCheck = await checkDuplicateImage(croppedImageData);
             
             if (duplicateCheck.is_duplicate) {
-                duplicateWarning.style.display = 'block';
-                updateStatus("❌ This face already exists in the system!", 'error');
-                
-                // Shake the face guide
-                faceGuide.style.animation = 'shake 0.5s ease';
-                setTimeout(() => {
-                    faceGuide.style.animation = '';
-                }, 500);
-                
-                // Reset
-                isProcessing = false;
-                return;
+                if (duplicateCheck.is_active === false) {
+                    // Inactive employee - show reactivation warning
+                    reactivationWarning.style.display = 'block';
+                    duplicateWarning.style.display = 'none';
+                    updateStatus("⚠️ Inactive employee detected - will reactivate", 'warning');
+                    isDuplicateFace = true;
+                    isInactiveDuplicate = true;
+                } else {
+                    // Active employee - block registration
+                    duplicateWarning.style.display = 'block';
+                    reactivationWarning.style.display = 'none';
+                    updateStatus("❌ This face already exists for an ACTIVE employee!", 'error');
+                    
+                    // Shake the face guide
+                    faceGuide.style.animation = 'shake 0.5s ease';
+                    setTimeout(() => {
+                        faceGuide.style.animation = '';
+                    }, 500);
+                    
+                    isProcessing = false;
+                    return;
+                }
+            } else {
+                // No duplicate - hide warnings
+                duplicateWarning.style.display = 'none';
+                reactivationWarning.style.display = 'none';
+                isDuplicateFace = false;
+                isInactiveDuplicate = false;
             }
-            
-            // Hide duplicate warning if it was showing
-            duplicateWarning.style.display = 'none';
             
             hasCaptured = true;
             
@@ -1005,6 +1325,20 @@
             validationStatus.style.display = 'block';
             captureBtn.disabled = true;
             duplicateWarning.style.display = 'none';
+            reactivationWarning.style.display = 'none';
+            
+            // Reset stability
+            stableFrames = 0;
+            lastStableState = false;
+            updateStabilityIndicator(0);
+            
+            // Clear no face timer
+            if (noFaceTimer) {
+                clearTimeout(noFaceTimer);
+                noFaceTimer = null;
+            }
+            
+            showWarning("Camera stopped. Please ensure good lighting and hold still.");
             updateValidationStatus();
             updateStatus('', 'ready');
         }
@@ -1043,6 +1377,11 @@
                 let employeeId = extractEmployeeIdFromText(text);
                 
                 if (employeeId) {
+                    if (isInactiveDuplicate) {
+                        showSuccess('Employee reactivated successfully!');
+                    } else {
+                        showSuccess('Employee registered successfully!');
+                    }
                     showRegistrationComplete(employeeId, name, email, userMda, phone);
                     return;
                 }
@@ -1074,8 +1413,16 @@
                 // Check for duplicate image error
                 if (text.includes('Face image already exists')) {
                     duplicateWarning.style.display = 'block';
-                    showError('This face image is already registered to another employee.');
+                    showError('This face image is already registered to an ACTIVE employee.');
                     resetForm();
+                    return;
+                }
+                
+                // Check for reactivation message
+                if (text.includes('reactivated')) {
+                    showSuccess('Employee reactivated successfully!');
+                    resetForm();
+                    window.location.href = '/employees';
                     return;
                 }
                 
@@ -1094,11 +1441,16 @@
             hasCaptured = false;
             isSubmitting = false;
             cameraActive = false;
+            isDuplicateFace = false;
+            isInactiveDuplicate = false;
+            stableFrames = 0;
+            lastStableState = false;
             faceImageInput.value = '';
             capturedImageData = null;
             
             errorMessage.style.display = 'none';
             successMessage.style.display = 'none';
+            warningMessage.style.display = 'none';
             
             registerCameraSection.style.display = 'none';
             startCameraBtn.style.display = 'block';
@@ -1107,6 +1459,8 @@
             captureBtn.style.display = 'block';
             croppedPreview.style.display = 'none';
             duplicateWarning.style.display = 'none';
+            reactivationWarning.style.display = 'none';
+            updateStabilityIndicator(0);
             updateValidationStatus();
             updateStatus('', 'ready');
         }
