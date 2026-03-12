@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Register Employee</title>
+    <title>Register Employee - Auto Capture</title>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body { 
@@ -98,17 +98,7 @@
             padding: 15px;
             margin-top: 10px;
             font-weight: bold;
-            animation: pulse 2s infinite;
-        }
-        .btn-capture:hover:not(:disabled) {
-            background: #e0a800;
-            transform: scale(1.02);
-        }
-        .btn-capture:disabled {
-            background: #ccc;
-            cursor: not-allowed;
-            opacity: 0.6;
-            animation: none;
+            display: none; /* Hidden for auto-capture */
         }
         @keyframes pulse {
             0% { transform: scale(1); }
@@ -146,33 +136,54 @@
             top: 50%;
             left: 50%;
             transform: translate(-50%, -50%);
-            width: 132px;
-            height: 168px;
+            width: 200px;
+            height: 250px;
             border: 3px solid rgba(255, 255, 255, 0.9);
             border-radius: 50% 50% 45% 45% / 55% 55% 45% 45%;
             box-shadow: 0 0 0 2000px rgba(128, 128, 128, 0.95);
             pointer-events: none;
-            transition: border-color 0.3s ease;
+            transition: border-color 0.3s ease, box-shadow 0.3s ease;
             z-index: 10;
         }
         .face-guide.face-detected {
-            border-color: #28a745;
-            box-shadow: 0 0 0 2000px rgba(128, 128, 128, 0.95), 0 0 20px #28a745;
+            border-color: #ffc107;
+            box-shadow: 0 0 0 2000px rgba(128, 128, 128, 0.95), 0 0 30px #ffc107;
+            animation: pulse-yellow 1.5s infinite;
+        }
+        .face-guide.capturing {
+            border-color: #17a2b8;
+            box-shadow: 0 0 0 2000px rgba(128, 128, 128, 0.95), 0 0 30px #17a2b8;
+            animation: pulse-blue 0.5s infinite;
+        }
+        .face-guide.duplicate-found {
+            border-color: #dc3545;
+            box-shadow: 0 0 0 2000px rgba(128, 128, 128, 0.95), 0 0 30px #dc3545;
+        }
+        @keyframes pulse-yellow {
+            0% { box-shadow: 0 0 0 2000px rgba(128, 128, 128, 0.95), 0 0 20px #ffc107; }
+            50% { box-shadow: 0 0 0 2000px rgba(128, 128, 128, 0.95), 0 0 40px #ffc107; }
+            100% { box-shadow: 0 0 0 2000px rgba(128, 128, 128, 0.95), 0 0 20px #ffc107; }
+        }
+        @keyframes pulse-blue {
+            0% { box-shadow: 0 0 0 2000px rgba(128, 128, 128, 0.95), 0 0 20px #17a2b8; }
+            50% { box-shadow: 0 0 0 2000px rgba(128, 128, 128, 0.95), 0 0 50px #17a2b8; }
+            100% { box-shadow: 0 0 0 2000px rgba(128, 128, 128, 0.95), 0 0 20px #17a2b8; }
         }
         .face-guide-label {
             position: absolute;
-            bottom: -30px;
+            bottom: -40px;
             left: 50%;
             transform: translateX(-50%);
             color: white;
-            font-size: 12px;
+            font-size: 14px;
             white-space: nowrap;
             text-shadow: 1px 1px 2px black;
-            background: rgba(0,0,0,0.7);
-            padding: 4px 12px;
+            background: rgba(0,0,0,0.8);
+            padding: 6px 16px;
             border-radius: 20px;
             pointer-events: none;
             z-index: 11;
+            font-weight: bold;
         }
         #registerStatus {
             text-align: center;
@@ -190,17 +201,17 @@
         
         .quality-bar {
             width: 100%;
-            height: 10px;
+            height: 8px;
             background: #e9ecef;
-            border-radius: 5px;
+            border-radius: 4px;
             margin: 10px 0;
             overflow: hidden;
         }
         .quality-fill {
             height: 100%;
             background: linear-gradient(90deg, #28a745, #20c997);
-            transition: width 0.3s ease;
-            border-radius: 5px;
+            transition: width 0.2s ease;
+            border-radius: 4px;
         }
         .quality-text {
             font-size: 14px;
@@ -384,7 +395,6 @@
             transition: all 0.3s ease;
             width: 100%;
             margin-top: 20px;
-            animation: pulse-green 2s infinite;
         }
         .done-btn:hover {
             background: #218838;
@@ -505,67 +515,51 @@
             margin-top: 5px;
             padding-left: 20px;
         }
-        /* Stability Indicator */
-        .stability-indicator {
-            display: flex;
-            justify-content: center;
-            gap: 8px;
-            margin: 10px 0;
-        }
-        .stability-bar {
-            width: 40px;
-            height: 8px;
-            background: #ddd;
-            border-radius: 4px;
-            transition: background 0.3s ease;
-        }
-        .stability-bar.active-1 {
-            background: #ffc107;
-        }
-        .stability-bar.active-2 {
-            background: #ffc107;
-        }
-        .stability-bar.active-3 {
-            background: #28a745;
-        }
-        .stability-text {
+        /* Auto-capture indicator */
+        .auto-capture-indicator {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: rgba(0,0,0,0.7);
+            color: #ffc107;
+            padding: 5px 10px;
+            border-radius: 20px;
             font-size: 12px;
-            color: #6c757d;
-            text-align: center;
-            margin-top: 5px;
+            font-weight: bold;
+            z-index: 20;
         }
-        /* Debug panel */
-        .debug-panel {
-            margin-top: 15px;
-            padding: 10px;
-            background: #f8f9fa;
-            border-radius: 8px;
-            display: none;
-            border: 2px solid #17a2b8;
-        }
-        .debug-panel h6 {
-            margin-bottom: 10px;
-            color: #17a2b8;
-        }
-        #debugInfo {
-            font-size: 12px;
-            background: white;
+        .brightness-warning {
+            background: #ff9800;
+            color: white;
             padding: 8px;
             border-radius: 5px;
-            border: 1px solid #dee2e6;
+            margin: 10px 0;
+            text-align: center;
+            font-size: 14px;
+            animation: pulse 2s infinite;
         }
-        #debugCanvas {
+        /* Progress bar */
+        .progress-bar {
+            position: absolute;
+            bottom: -30px;
+            left: 0;
             width: 100%;
-            margin-top: 10px;
-            display: none;
-            border: 2px solid #17a2b8;
-            border-radius: 5px;
+            height: 6px;
+            background: #444;
+            border-radius: 3px;
+            overflow: hidden;
+        }
+        .progress-fill {
+            height: 100%;
+            width: 0%;
+            background: linear-gradient(90deg, #28a745, #20c997);
+            transition: width 0.3s ease;
         }
     </style>
 </head>
 <body>
     <div class="container">
-        <h2>👤 Register Employee</h2>
+        <h2>👤 Register Employee - Auto Capture</h2>
         
         <!-- Flash Messages from Server -->
         <div class="flash-messages">
@@ -598,6 +592,8 @@
         <div id="reactivationWarning" class="reactivation-warning" style="display: none;">
             🔄 This face belongs to an INACTIVE employee. Registration will reactivate them.
         </div>
+        
+        <div id="brightnessWarning" class="brightness-warning" style="display: none;"></div>
         
         <div id="errorMessage" class="error-message"></div>
         <div id="warningMessage" class="warning-message"></div>
@@ -666,11 +662,18 @@
 
                 <!-- AUTO-CAPTURE CAMERA SECTION -->
                 <div id="registerCameraSection" class="camera-section">
-                    <label class="form-label">📸 Position your face in the frame</label>
+                    <div class="auto-capture-indicator" id="autoCaptureIndicator">
+                        ⚡ AUTO-CAPTURE ACTIVE
+                    </div>
+                    
+                    <label class="form-label">📸 Position your face in the frame - we'll auto-capture</label>
                     <div class="camera-container">
                         <video id="registerVideo" autoplay muted playsinline></video>
                         <div class="face-guide" id="faceGuide">
                             <div class="face-guide-label" id="faceGuideLabel">Position face here</div>
+                        </div>
+                        <div id="progressBar" class="progress-bar" style="display: none;">
+                            <div id="progressFill" class="progress-fill"></div>
                         </div>
                     </div>
                     
@@ -681,7 +684,7 @@
                             <li>Ensure good, even lighting on your face</li>
                             <li>Position your face fully within the oval guide</li>
                             <li>Remove glasses if they cause glare</li>
-                            <li>Look directly at the camera and hold still</li>
+                            <li>System will auto-capture when face is stable</li>
                         </ul>
                     </div>
                     
@@ -691,44 +694,16 @@
                     </div>
                     <div class="quality-text" id="qualityText"></div>
                     
-                    <!-- Stability Indicator -->
-                    <div id="stabilityIndicator" style="display: none;">
-                        <div class="stability-indicator">
-                            <div class="stability-bar" id="stabilityBar1"></div>
-                            <div class="stability-bar" id="stabilityBar2"></div>
-                            <div class="stability-bar" id="stabilityBar3"></div>
-                        </div>
-                        <div class="stability-text" id="stabilityText">Hold still...</div>
-                    </div>
-                    
                     <!-- Hidden canvas for cropping -->
                     <canvas id="cropCanvas" style="display:none;"></canvas>
-                    <canvas id="registerCanvas" style="display:none;"></canvas>
                     
                     <!-- Cropped Preview -->
                     <img id="croppedPreview" class="cropped-preview" alt="Cropped Face">
                     
-                    <!-- Debug Panel -->
-                    <div class="debug-panel" id="debugPanel">
-                        <h6>🔧 Debug Info</h6>
-                        <div id="debugInfo"></div>
-                        <button type="button" class="btn btn-sm btn-warning mt-2" onclick="captureDebugImage()">
-                            📸 Capture Debug Image
-                        </button>
-                        <canvas id="debugCanvas"></canvas>
-                    </div>
-                    
-                    <!-- Manual Capture Button -->
-                    <button type="button" class="btn btn-capture" id="captureBtn" disabled onclick="manualCapture()">
-                        <i class="fas fa-camera-retro me-2"></i>📸 HOLD STILL & CAPTURE
-                    </button>
-                    
+                    <!-- Cancel Button Only -->
                     <div class="button-group">
                         <button type="button" class="btn btn-secondary" id="cancelCameraBtn" onclick="cancelCamera()">
-                            ❌ Cancel
-                        </button>
-                        <button type="button" class="btn btn-info" id="debugToggleBtn" onclick="toggleDebug()">
-                            🔧 Debug
+                            ❌ Cancel Camera
                         </button>
                     </div>
                 </div>
@@ -763,6 +738,7 @@
             document.getElementById('errorMessage').style.display = 'none';
             document.getElementById('successMessage').style.display = 'none';
             document.getElementById('warningMessage').style.display = 'none';
+            document.getElementById('brightnessWarning').style.display = 'none';
             
             // Initial validation check
             updateValidationStatus();
@@ -777,23 +753,23 @@
         let hasCaptured = false;
         let isSubmitting = false;
         let cameraActive = false;
-        let faceFrame = null;
         let capturedImageData = null;
         let debugMode = false;
         let noFaceTimer = null;
         let isDuplicateFace = false;
         let isInactiveDuplicate = false;
+        let autoCaptureTimer = null;
+        let lastCaptureTime = 0;
         
-        const DETECTION_THROTTLE_MS = 500; // Increased to 500ms for stability
-        const REQUIRED_STABLE_FRAMES = 3; // Need 3 consecutive frames
-        const FRAME_WIDTH = 132;
-        const FRAME_HEIGHT = 168;
+        const DETECTION_THROTTLE_MS = 100;
+        const REQUIRED_STABLE_FRAMES = 3;
+        const MIN_CAPTURE_INTERVAL = 2000; // Minimum 2 seconds between captures
+        const CAPTURE_DELAY = 500; // Wait 500ms after stable before capturing
 
         const registerForm = document.getElementById('registerForm');
         const registerStatus = document.getElementById('registerStatus');
         const registerCameraSection = document.getElementById('registerCameraSection');
         const registerVideo = document.getElementById('registerVideo');
-        const registerCanvas = document.getElementById('registerCanvas');
         const cropCanvas = document.getElementById('cropCanvas');
         const croppedPreview = document.getElementById('croppedPreview');
         const submitBtn = document.getElementById('submitBtn');
@@ -804,6 +780,7 @@
         const errorMessage = document.getElementById('errorMessage');
         const warningMessage = document.getElementById('warningMessage');
         const successMessage = document.getElementById('successMessage');
+        const brightnessWarning = document.getElementById('brightnessWarning');
         const registrationComplete = document.getElementById('registrationComplete');
         const formFields = document.getElementById('formFields');
         const displayEmployeeId = document.getElementById('displayEmployeeId');
@@ -812,11 +789,12 @@
         const copyIdBtn = document.getElementById('copyIdBtn');
         const faceGuide = document.getElementById('faceGuide');
         const faceGuideLabel = document.getElementById('faceGuideLabel');
+        const progressBar = document.getElementById('progressBar');
+        const progressFill = document.getElementById('progressFill');
         const emailInput = document.getElementById('email');
         const phoneInput = document.getElementById('phone');
         const startCameraBtn = document.getElementById('startCameraBtn');
         const cancelCameraBtn = document.getElementById('cancelCameraBtn');
-        const captureBtn = document.getElementById('captureBtn');
         const validationStatus = document.getElementById('validationStatus');
         const statusText = document.getElementById('statusText');
         const duplicateWarning = document.getElementById('duplicateWarning');
@@ -824,40 +802,13 @@
         const debugPanel = document.getElementById('debugPanel');
         const debugInfo = document.getElementById('debugInfo');
         const debugCanvas = document.getElementById('debugCanvas');
-        
-        // Stability indicator elements
-        const stabilityIndicator = document.getElementById('stabilityIndicator');
-        const stabilityBar1 = document.getElementById('stabilityBar1');
-        const stabilityBar2 = document.getElementById('stabilityBar2');
-        const stabilityBar3 = document.getElementById('stabilityBar3');
-        const stabilityText = document.getElementById('stabilityText');
-
-        function updateStabilityIndicator(frames) {
-            if (frames > 0) {
-                stabilityIndicator.style.display = 'block';
-                
-                // Update bars
-                stabilityBar1.className = 'stability-bar' + (frames >= 1 ? ' active-1' : '');
-                stabilityBar2.className = 'stability-bar' + (frames >= 2 ? ' active-2' : '');
-                stabilityBar3.className = 'stability-bar' + (frames >= 3 ? ' active-3' : '');
-                
-                // Update text
-                if (frames >= REQUIRED_STABLE_FRAMES) {
-                    stabilityText.textContent = '✅ Stable! Click capture';
-                    stabilityText.style.color = '#28a745';
-                } else {
-                    stabilityText.textContent = `Hold still... ${frames}/${REQUIRED_STABLE_FRAMES}`;
-                    stabilityText.style.color = '#ffc107';
-                }
-            } else {
-                stabilityIndicator.style.display = 'none';
-            }
-        }
+        const autoCaptureIndicator = document.getElementById('autoCaptureIndicator');
 
         function showError(message, field = null) {
             successMessage.style.display = 'none';
             warningMessage.style.display = 'none';
             registrationComplete.style.display = 'none';
+            brightnessWarning.style.display = 'none';
             
             errorMessage.textContent = '❌ ' + message;
             errorMessage.style.display = 'block';
@@ -878,6 +829,7 @@
         function showWarning(message) {
             errorMessage.style.display = 'none';
             successMessage.style.display = 'none';
+            brightnessWarning.style.display = 'none';
             
             warningMessage.textContent = '⚠️ ' + message;
             warningMessage.style.display = 'block';
@@ -890,6 +842,7 @@
         function showSuccess(message) {
             errorMessage.style.display = 'none';
             warningMessage.style.display = 'none';
+            brightnessWarning.style.display = 'none';
             registrationComplete.style.display = 'none';
             
             successMessage.textContent = '✅ ' + message;
@@ -938,6 +891,7 @@
             errorMessage.style.display = 'none';
             successMessage.style.display = 'none';
             warningMessage.style.display = 'none';
+            brightnessWarning.style.display = 'none';
             
             displayEmployeeId.textContent = employeeId;
             
@@ -994,13 +948,11 @@
             const ctx = canvas.getContext('2d');
             ctx.drawImage(registerVideo, 0, 0);
             
-            // Display the captured frame
             debugCanvas.width = canvas.width;
             debugCanvas.height = canvas.height;
             debugCanvas.getContext('2d').drawImage(canvas, 0, 0);
             debugCanvas.style.display = 'block';
             
-            // Send to server for analysis
             const imageData = canvas.toDataURL('image/jpeg', 0.9);
             
             debugInfo.innerHTML = `
@@ -1039,18 +991,14 @@
         async function detectFaceWithAPI() {
             if (!registerVideo || !registerVideo.videoWidth || isProcessing || hasCaptured || isSubmitting) return null;
             
-            const now = Date.now();
-            if (now - lastDetectionTime < DETECTION_THROTTLE_MS) {
-                return null;
-            }
-            
-            lastDetectionTime = now;
-            
             const canvas = document.createElement('canvas');
-            canvas.width = registerVideo.videoWidth;
-            canvas.height = registerVideo.videoHeight;
-            canvas.getContext('2d').drawImage(registerVideo, 0, 0);
-            const imageData = canvas.toDataURL('image/jpeg', 0.8);
+            canvas.width = 320;
+            canvas.height = 240;
+            
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(registerVideo, 0, 0, canvas.width, canvas.height);
+            
+            const imageData = canvas.toDataURL('image/jpeg', 0.6);
             
             try {
                 const response = await fetch('/detect_face', {
@@ -1061,13 +1009,11 @@
                 
                 const result = await response.json();
                 
-                // Update debug info if debug mode is on
                 if (debugMode) {
                     debugInfo.innerHTML = `
                         <div>📊 Image size: ${canvas.width} x ${canvas.height}</div>
                         <div>🔍 Face detected: ${result.face_detected ? '✅ YES' : '❌ NO'}</div>
                         <div>📈 Quality: ${result.quality ? Math.round(result.quality * 100) + '%' : 'N/A'}</div>
-                        <div>👁️ Liveness: ${result.liveness_passed ? '✅' : '❌'}</div>
                     `;
                 }
                 
@@ -1094,14 +1040,47 @@
             }
         }
 
+        async function checkImageQuality(imageData) {
+            return new Promise((resolve) => {
+                const img = new Image();
+                img.onload = function() {
+                    const canvas = document.createElement('canvas');
+                    canvas.width = img.width;
+                    canvas.height = img.height;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0);
+                    
+                    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                    const data = imageData.data;
+                    
+                    let sum = 0;
+                    for (let i = 0; i < data.length; i += 4) {
+                        sum += data[i] + data[i+1] + data[i+2];
+                    }
+                    const avgBrightness = sum / (data.length / 4 * 3);
+                    
+                    if (avgBrightness < 50) {
+                        resolve({ quality: 'poor', reason: 'Image too dark', brightness: avgBrightness });
+                    } else if (avgBrightness > 200) {
+                        resolve({ quality: 'poor', reason: 'Image too bright', brightness: avgBrightness });
+                    } else {
+                        resolve({ quality: 'good', brightness: avgBrightness });
+                    }
+                };
+                img.src = imageData;
+            });
+        }
+
         function startRegisterCamera() {
             if (hasCaptured || isSubmitting || cameraActive) return;
             
-            // Reset stability
             stableFrames = 0;
             lastStableState = false;
             
-            // Clear any existing timer
+            if (autoCaptureTimer) {
+                clearTimeout(autoCaptureTimer);
+                autoCaptureTimer = null;
+            }
             if (noFaceTimer) clearTimeout(noFaceTimer);
             
             cameraActive = true;
@@ -1110,12 +1089,15 @@
             registerCameraSection.style.display = 'block';
             duplicateWarning.style.display = 'none';
             reactivationWarning.style.display = 'none';
-            updateStatus("Camera starting...", 'active');
+            brightnessWarning.style.display = 'none';
+            progressBar.style.display = 'none';
+            
+            updateStatus("Starting camera...", 'active');
             
             navigator.mediaDevices.getUserMedia({ 
                 video: { 
-                    width: { ideal: 640 },
-                    height: { ideal: 480 },
+                    width: { ideal: 480 },
+                    height: { ideal: 360 },
                     facingMode: 'user'
                 } 
             })
@@ -1123,83 +1105,104 @@
                 registerStream = stream;
                 registerVideo.srcObject = stream;
                 registerVideo.onloadedmetadata = () => {
-                    updateStatus("Camera ready! Position your face in the frame", 'active');
-                    startFaceDetection();
+                    updateStatus("Camera ready! Position your face", 'active');
                     
-                    // Set timeout for no face detection
+                    setTimeout(() => {
+                        startFaceDetection();
+                    }, 100);
+                    
                     noFaceTimer = setTimeout(() => {
                         if (!lastStableState && cameraActive) {
-                            showWarning("Still no stable face detected. Please check lighting and hold still.");
+                            showWarning("No face detected. Please ensure good lighting.");
                         }
-                    }, 10000);
+                    }, 5000);
                 };
             })
             .catch(err => {
-                updateStatus("Camera access denied: " + err.message, 'error');
+                updateStatus("Camera access denied", 'error');
                 showError(`Camera error: ${err.message}`);
                 cancelCamera();
             });
         }
 
         function startFaceDetection() {
+            let frameCount = 0;
+            let stableStartTime = null;
+            
             const detectFaces = async () => {
                 if (isProcessing || hasCaptured || isSubmitting) {
                     requestAnimationFrame(detectFaces);
                     return;
                 }
                 
+                frameCount++;
+                if (frameCount % 2 !== 0) {
+                    requestAnimationFrame(detectFaces);
+                    return;
+                }
+                
                 const result = await detectFaceWithAPI();
                 
-                if (result && result.face_detected && !isProcessing && !hasCaptured && !isSubmitting) {
-                    // Face detected - increment stable counter
+                if (result && result.face_detected) {
                     stableFrames = Math.min(stableFrames + 1, REQUIRED_STABLE_FRAMES);
-                    updateStabilityIndicator(stableFrames);
                     
-                    if (stableFrames >= REQUIRED_STABLE_FRAMES && !lastStableState) {
-                        // Stable detection achieved
-                        lastStableState = true;
+                    if (stableFrames >= REQUIRED_STABLE_FRAMES) {
+                        // Face is stable
+                        if (!lastStableState) {
+                            // Just became stable
+                            lastStableState = true;
+                            stableStartTime = Date.now();
+                            
+                            faceGuide.classList.add('face-detected');
+                            faceGuideLabel.textContent = '✅ Face stable - capturing...';
+                            
+                            qualityBar.style.display = 'block';
+                            qualityFill.style.width = `${result.quality * 100}%`;
+                            qualityText.textContent = `Face quality: ${Math.round(result.quality * 100)}%`;
+                            
+                            progressBar.style.display = 'block';
+                            
+                            if (noFaceTimer) {
+                                clearTimeout(noFaceTimer);
+                                noFaceTimer = null;
+                            }
+                        }
                         
-                        qualityBar.style.display = 'block';
-                        qualityFill.style.width = `${result.quality * 100}%`;
-                        qualityText.textContent = `Face quality: ${Math.round(result.quality * 100)}%`;
-                        
-                        faceGuide.classList.add('face-detected');
-                        faceGuideLabel.textContent = '✅ Face stable! Click CAPTURE';
-                        
-                        // Enable capture button
-                        captureBtn.disabled = false;
-                        updateStatus("Face stable! Click CAPTURE button now", 'face');
-                        
-                        // Clear no face timer
-                        if (noFaceTimer) {
-                            clearTimeout(noFaceTimer);
-                            noFaceTimer = null;
+                        // Show progress
+                        if (stableStartTime) {
+                            const elapsed = Date.now() - stableStartTime;
+                            const progress = Math.min((elapsed / CAPTURE_DELAY) * 100, 100);
+                            progressFill.style.width = `${progress}%`;
+                            
+                            if (elapsed >= CAPTURE_DELAY) {
+                                // Time to capture!
+                                const now = Date.now();
+                                if (now - lastCaptureTime > MIN_CAPTURE_INTERVAL) {
+                                    lastCaptureTime = now;
+                                    autoCapture();
+                                }
+                            }
+                        }
+                    } else {
+                        // Not stable yet
+                        if (lastStableState) {
+                            lastStableState = false;
+                            stableStartTime = null;
+                            faceGuide.classList.remove('face-detected');
+                            faceGuideLabel.textContent = 'Hold still...';
+                            progressBar.style.display = 'none';
                         }
                     }
                 } else {
-                    // No face detected - decrement stable counter
-                    if (stableFrames > 0) {
-                        stableFrames = Math.max(stableFrames - 1, 0);
-                        updateStabilityIndicator(stableFrames);
-                    }
-                    
-                    if (stableFrames === 0 && lastStableState) {
-                        // Stable detection lost
+                    // No face detected
+                    stableFrames = 0;
+                    if (lastStableState) {
                         lastStableState = false;
-                        
-                        qualityBar.style.display = 'none';
-                        qualityText.textContent = '';
+                        stableStartTime = null;
                         faceGuide.classList.remove('face-detected');
-                        
-                        if (registerVideo.videoWidth > 0) {
-                            faceGuideLabel.textContent = '❌ Hold still - stabilizing...';
-                            updateStatus("Please hold still - stabilizing face detection", 'error');
-                        } else {
-                            faceGuideLabel.textContent = 'Position face here';
-                        }
-                        
-                        // Disable capture button
-                        captureBtn.disabled = true;
+                        faceGuideLabel.textContent = 'Position face here';
+                        qualityBar.style.display = 'none';
+                        progressBar.style.display = 'none';
                     }
                 }
                 
@@ -1209,112 +1212,163 @@
         }
 
         function cropFaceFromFrame() {
+            console.log("📸 Cropping face from frame...");
             const video = registerVideo;
             const videoWidth = video.videoWidth;
             const videoHeight = video.videoHeight;
             
-            // Get the position of the face guide relative to video
+            if (!videoWidth || !videoHeight) {
+                console.log("❌ Video not ready");
+                return null;
+            }
+            
             const rect = registerVideo.getBoundingClientRect();
             const guideRect = faceGuide.getBoundingClientRect();
             
-            // Calculate the face guide position in video coordinates
             const scaleX = videoWidth / rect.width;
             const scaleY = videoHeight / rect.height;
             
-            const guideLeft = (guideRect.left - rect.left) * scaleX;
-            const guideTop = (guideRect.top - rect.top) * scaleY;
-            const guideWidth = guideRect.width * scaleX;
-            const guideHeight = guideRect.height * scaleY;
+            const padding = 0.3;
             
-            // Set crop canvas size to frame dimensions
-            cropCanvas.width = FRAME_WIDTH * 2;
-            cropCanvas.height = FRAME_HEIGHT * 2;
+            const guideLeft = Math.max(0, (guideRect.left - rect.left) * scaleX);
+            const guideTop = Math.max(0, (guideRect.top - rect.top) * scaleY);
+            const guideWidth = Math.min(videoWidth - guideLeft, guideRect.width * scaleX);
+            const guideHeight = Math.min(videoHeight - guideTop, guideRect.height * scaleY);
             
-            // Draw the cropped face
+            const paddedLeft = Math.max(0, guideLeft - (guideWidth * padding / 2));
+            const paddedTop = Math.max(0, guideTop - (guideHeight * padding / 2));
+            const paddedWidth = Math.min(videoWidth - paddedLeft, guideWidth * (1 + padding));
+            const paddedHeight = Math.min(videoHeight - paddedTop, guideHeight * (1 + padding));
+            
+            cropCanvas.width = 320;
+            cropCanvas.height = 320;
+            
             const ctx = cropCanvas.getContext('2d');
+            ctx.fillStyle = '#FFFFFF';
+            ctx.fillRect(0, 0, cropCanvas.width, cropCanvas.height);
+            
             ctx.drawImage(
                 video,
-                guideLeft, guideTop, guideWidth, guideHeight,
+                paddedLeft, paddedTop, paddedWidth, paddedHeight,
                 0, 0, cropCanvas.width, cropCanvas.height
             );
             
-            return cropCanvas.toDataURL('image/jpeg', 0.9);
+            return cropCanvas.toDataURL('image/jpeg', 0.85);
         }
 
-        async function manualCapture() {
-            if (isProcessing || hasCaptured || isSubmitting || !lastStableState) return;
+        async function autoCapture() {
+            console.log("📸 Auto-capturing...");
+            
+            if (isProcessing || hasCaptured || isSubmitting) {
+                return;
+            }
             
             isProcessing = true;
             
-            // Clear no face timer
-            if (noFaceTimer) {
-                clearTimeout(noFaceTimer);
-                noFaceTimer = null;
-            }
-            
             // Flash effect
+            faceGuide.classList.add('capturing');
             registerVideo.classList.add('flash-message');
-            setTimeout(() => registerVideo.classList.remove('flash-message'), 200);
             
-            // Crop face from frame
             const croppedImageData = cropFaceFromFrame();
             
-            // Check for duplicate image
-            updateStatus("Checking for duplicate image...", 'active');
-            const duplicateCheck = await checkDuplicateImage(croppedImageData);
+            setTimeout(() => {
+                registerVideo.classList.remove('flash-message');
+                faceGuide.classList.remove('capturing');
+            }, 200);
             
-            if (duplicateCheck.is_duplicate) {
-                if (duplicateCheck.is_active === false) {
-                    // Inactive employee - show reactivation warning
-                    reactivationWarning.style.display = 'block';
-                    duplicateWarning.style.display = 'none';
-                    updateStatus("⚠️ Inactive employee detected - will reactivate", 'warning');
-                    isDuplicateFace = true;
-                    isInactiveDuplicate = true;
-                } else {
-                    // Active employee - block registration
-                    duplicateWarning.style.display = 'block';
-                    reactivationWarning.style.display = 'none';
-                    updateStatus("❌ This face already exists for an ACTIVE employee!", 'error');
-                    
-                    // Shake the face guide
-                    faceGuide.style.animation = 'shake 0.5s ease';
-                    setTimeout(() => {
-                        faceGuide.style.animation = '';
-                    }, 500);
-                    
-                    isProcessing = false;
-                    return;
-                }
-            } else {
-                // No duplicate - hide warnings
-                duplicateWarning.style.display = 'none';
-                reactivationWarning.style.display = 'none';
-                isDuplicateFace = false;
-                isInactiveDuplicate = false;
+            if (!croppedImageData) {
+                updateStatus("❌ Capture failed", 'error');
+                isProcessing = false;
+                return;
             }
             
-            hasCaptured = true;
-            
-            // Save cropped image
-            faceImageInput.value = croppedImageData;
-            capturedImageData = croppedImageData;
-            
-            // Show preview of cropped face
+            // Show preview
             croppedPreview.src = croppedImageData;
             croppedPreview.style.display = 'block';
             
-            // Disable capture button
-            captureBtn.disabled = true;
-            captureBtn.style.display = 'none';
+            updateStatus("Checking image...", 'active');
             
-            updateStatus("✅ Face captured! Registering...", 'success');
-            
-            // Stop camera
-            stopRegisterCamera();
-            
-            // Submit registration immediately
-            submitRegistration();
+            try {
+                // Check quality
+                const qualityCheck = await checkImageQuality(croppedImageData);
+                console.log("Quality check:", qualityCheck);
+                
+                if (qualityCheck.quality === 'poor') {
+                    brightnessWarning.textContent = `⚠️ ${qualityCheck.reason}. You may proceed but results might be affected.`;
+                    brightnessWarning.style.display = 'block';
+                }
+                
+                // Verify face
+                const detectResponse = await fetch('/detect_face', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({image: croppedImageData})
+                });
+                
+                const detectResult = await detectResponse.json();
+                
+                if (!detectResult.face_detected) {
+                    updateStatus("❌ No face in capture", 'error');
+                    croppedPreview.style.display = 'none';
+                    brightnessWarning.style.display = 'none';
+                    isProcessing = false;
+                    return;
+                }
+                
+                // Check for duplicates
+                const duplicateCheck = await checkDuplicateImage(croppedImageData);
+                console.log("Duplicate check:", duplicateCheck);
+                
+                if (duplicateCheck.is_duplicate) {
+                    if (duplicateCheck.is_active === false) {
+                        reactivationWarning.style.display = 'block';
+                        duplicateWarning.style.display = 'none';
+                        updateStatus("⚠️ Inactive employee detected - will reactivate", 'warning');
+                        isDuplicateFace = true;
+                        isInactiveDuplicate = true;
+                    } else {
+                        duplicateWarning.style.display = 'block';
+                        reactivationWarning.style.display = 'none';
+                        updateStatus("❌ This face already exists for an ACTIVE employee!", 'error');
+                        
+                        faceGuide.classList.add('duplicate-found');
+                        setTimeout(() => {
+                            faceGuide.classList.remove('duplicate-found');
+                        }, 2000);
+                        
+                        croppedPreview.style.display = 'none';
+                        brightnessWarning.style.display = 'none';
+                        isProcessing = false;
+                        return;
+                    }
+                } else {
+                    duplicateWarning.style.display = 'none';
+                    reactivationWarning.style.display = 'none';
+                    isDuplicateFace = false;
+                    isInactiveDuplicate = false;
+                }
+                
+                hasCaptured = true;
+                console.log("✅ Capture successful");
+                
+                faceImageInput.value = croppedImageData;
+                capturedImageData = croppedImageData;
+                
+                updateStatus("✅ Face captured! Registering...", 'success');
+                
+                stopRegisterCamera();
+                
+                setTimeout(() => {
+                    submitRegistration();
+                }, 100);
+                
+            } catch (error) {
+                console.error('❌ Error in auto-capture:', error);
+                updateStatus("❌ Error processing image. Please try again.", 'error');
+                croppedPreview.style.display = 'none';
+                brightnessWarning.style.display = 'none';
+                isProcessing = false;
+            }
         }
 
         function cancelCamera() {
@@ -1323,22 +1377,24 @@
             registerCameraSection.style.display = 'none';
             startCameraBtn.style.display = 'block';
             validationStatus.style.display = 'block';
-            captureBtn.disabled = true;
             duplicateWarning.style.display = 'none';
             reactivationWarning.style.display = 'none';
+            brightnessWarning.style.display = 'none';
+            progressBar.style.display = 'none';
             
-            // Reset stability
             stableFrames = 0;
             lastStableState = false;
-            updateStabilityIndicator(0);
             
-            // Clear no face timer
+            if (autoCaptureTimer) {
+                clearTimeout(autoCaptureTimer);
+                autoCaptureTimer = null;
+            }
             if (noFaceTimer) {
                 clearTimeout(noFaceTimer);
                 noFaceTimer = null;
             }
             
-            showWarning("Camera stopped. Please ensure good lighting and hold still.");
+            showWarning("Camera stopped. Please ensure good lighting.");
             updateValidationStatus();
             updateStatus('', 'ready');
         }
@@ -1350,7 +1406,7 @@
             }
             isProcessing = false;
             faceDetected = false;
-            faceGuide.classList.remove('face-detected');
+            faceGuide.classList.remove('face-detected', 'capturing', 'duplicate-found');
             faceGuideLabel.textContent = 'Position face here';
         }
 
@@ -1363,7 +1419,6 @@
             const email = document.getElementById('email').value;
             const phone = document.getElementById('phone').value;
             
-            // Get the current user's MDA from the hidden field
             const userMda = document.querySelector('input[name="user_mda"]').value;
             
             updateStatus('Registering...', 'active');
@@ -1372,8 +1427,16 @@
                 method: 'POST',
                 body: formData
             })
-            .then(response => response.text())
+            .then(response => {
+                if (response.redirected) {
+                    window.location.href = response.url;
+                    return;
+                }
+                return response.text();
+            })
             .then(text => {
+                if (!text) return;
+                
                 let employeeId = extractEmployeeIdFromText(text);
                 
                 if (employeeId) {
@@ -1384,6 +1447,14 @@
                     }
                     showRegistrationComplete(employeeId, name, email, userMda, phone);
                     return;
+                }
+                
+                if (text.includes('registered successfully') || text.includes('reactivated successfully')) {
+                    const idMatch = text.match(/[A-Z]{4}\d{4}/);
+                    if (idMatch) {
+                        showRegistrationComplete(idMatch[0], name, email, userMda, phone);
+                        return;
+                    }
                 }
                 
                 if (text.includes('Email') && text.includes('already registered')) {
@@ -1410,7 +1481,6 @@
                     return;
                 }
                 
-                // Check for duplicate image error
                 if (text.includes('Face image already exists')) {
                     duplicateWarning.style.display = 'block';
                     showError('This face image is already registered to an ACTIVE employee.');
@@ -1418,11 +1488,11 @@
                     return;
                 }
                 
-                // Check for reactivation message
                 if (text.includes('reactivated')) {
                     showSuccess('Employee reactivated successfully!');
-                    resetForm();
-                    window.location.href = '/employees';
+                    setTimeout(() => {
+                        window.location.href = '/employees';
+                    }, 2000);
                     return;
                 }
                 
@@ -1430,6 +1500,7 @@
                 resetForm();
             })
             .catch(error => {
+                console.error('Registration error:', error);
                 showError('Registration failed. Please try again.');
                 resetForm();
             });
@@ -1451,16 +1522,16 @@
             errorMessage.style.display = 'none';
             successMessage.style.display = 'none';
             warningMessage.style.display = 'none';
+            brightnessWarning.style.display = 'none';
             
             registerCameraSection.style.display = 'none';
             startCameraBtn.style.display = 'block';
             validationStatus.style.display = 'block';
-            captureBtn.disabled = true;
-            captureBtn.style.display = 'block';
             croppedPreview.style.display = 'none';
             duplicateWarning.style.display = 'none';
             reactivationWarning.style.display = 'none';
-            updateStabilityIndicator(0);
+            progressBar.style.display = 'none';
+            
             updateValidationStatus();
             updateStatus('', 'ready');
         }

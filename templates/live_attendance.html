@@ -4,8 +4,8 @@
     <div class="col-md-8">
         <div class="card">
             <div class="card-body text-center">
-                <h2>🔴 Live Attendance</h2>
-                <p class="text-muted">Look at the camera to automatically sign in/out</p>
+                <h2>🔴 Live Attendance - Auto Recognition</h2>
+                <p class="text-muted">Look at the camera - we'll automatically identify you and mark attendance</p>
                 
                 <!-- Button to open camera (initially visible) -->
                 <div id="startButtonContainer">
@@ -16,12 +16,40 @@
                 
                 <!-- Camera section (initially hidden) -->
                 <div id="attendanceCameraSection" style="display: none;">
-                    <label class="form-label">📸 Face Recognition - Look at the camera</label>
+                    <div class="position-relative">
+                        <span id="autoCaptureIndicator" style="position: absolute; top: 20px; right: 60px; background: rgba(0,0,0,0.7); color: #ffc107; padding: 5px 15px; border-radius: 20px; font-size: 12px; font-weight: bold; z-index: 30;">
+                            ⚡ AUTO-RECOGNITION ACTIVE
+                        </span>
+                        <span id="livenessIndicator" style="position: absolute; top: 20px; left: 60px; background: rgba(0,0,0,0.7); color: #17a2b8; padding: 5px 15px; border-radius: 20px; font-size: 12px; font-weight: bold; z-index: 30; display: none;">
+                            👁️ LIVENESS CHECK
+                        </span>
+                    </div>
+                    
+                    <label class="form-label">📸 Face Recognition - Position your face in the oval</label>
                     <div class="camera-container" style="position: relative; width: 100%; height: 350px; background: #000; border-radius: 15px; overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,0.2);">
                         <video id="attendanceVideo" width="100%" height="100%" autoplay muted playsinline style="object-fit: cover;"></video>
-                        <div id="attendanceFaceGuide" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 198px; height: 252px; border: 4px solid rgba(255, 255, 255, 0.9); border-radius: 50% 50% 45% 45% / 55% 55% 45% 45%; box-shadow: 0 0 0 2000px rgba(128, 128, 128, 0.95); pointer-events: none; transition: border-color 0.3s ease; z-index: 10;">
-                            <div id="attendanceFaceGuideLabel" style="position: absolute; bottom: -35px; left: 50%; transform: translateX(-50%); color: white; font-size: 14px; white-space: nowrap; text-shadow: 1px 1px 2px black; background: rgba(0,0,0,0.7); padding: 5px 15px; border-radius: 20px; pointer-events: none; z-index: 11;">Look here</div>
+                        
+                        <!-- Face guide with positioning markers -->
+                        <div id="attendanceFaceGuide" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 200px; height: 250px; border: 4px solid rgba(255, 255, 255, 0.9); border-radius: 50% 50% 45% 45% / 55% 55% 45% 45%; box-shadow: 0 0 0 2000px rgba(128, 128, 128, 0.95); pointer-events: none; transition: all 0.3s ease; z-index: 10;">
+                            <!-- Eye position guides -->
+                            <div style="position: absolute; top: 35%; left: 25%; width: 8px; height: 8px; border-radius: 50%; background: rgba(255,255,255,0.5); border: 1px solid rgba(255,255,255,0.8);"></div>
+                            <div style="position: absolute; top: 35%; right: 25%; width: 8px; height: 8px; border-radius: 50%; background: rgba(255,255,255,0.5); border: 1px solid rgba(255,255,255,0.8);"></div>
+                            <!-- Nose position guide -->
+                            <div style="position: absolute; top: 55%; left: 50%; transform: translateX(-50%); width: 6px; height: 6px; border-radius: 50%; background: rgba(255,255,255,0.5); border: 1px solid rgba(255,255,255,0.8);"></div>
+                            
+                            <div id="attendanceFaceGuideLabel" style="position: absolute; bottom: -35px; left: 50%; transform: translateX(-50%); color: white; font-size: 14px; white-space: nowrap; text-shadow: 1px 1px 2px black; background: rgba(0,0,0,0.7); padding: 5px 15px; border-radius: 20px; pointer-events: none; z-index: 11;">Position face here</div>
                         </div>
+                        
+                        <!-- Position warning -->
+                        <div id="positionWarning" style="position: absolute; top: 10px; left: 50%; transform: translateX(-50%); background: rgba(255, 193, 7, 0.9); color: #000; padding: 5px 15px; border-radius: 20px; font-size: 12px; font-weight: bold; z-index: 15; display: none;">
+                            ⚠️ Adjust position - face not centered
+                        </div>
+                        
+                        <!-- Progress bar -->
+                        <div id="attendanceProgressBar" style="position: absolute; bottom: 0; left: 0; width: 100%; height: 6px; background: #444; display: none;">
+                            <div id="attendanceProgressFill" style="height: 100%; width: 0%; background: linear-gradient(90deg, #28a745, #20c997); transition: width 0.3s ease;"></div>
+                        </div>
+                        
                         <!-- Status overlay -->
                         <div id="attendanceStatusOverlay" style="position: absolute; bottom: 20px; left: 20px; right: 20px; background: rgba(0,0,0,0.8); color: white; padding: 12px; border-radius: 50px; text-align: center; font-weight: bold; z-index: 15; display: none;"></div>
                         
@@ -31,14 +59,53 @@
                         </button>
                     </div>
                     
-                    <div id="attendanceFaceStatus" class="mt-3 fw-bold"></div>
-                    <div class="progress mt-2" id="attendanceQualityBar" style="height: 8px;">
-                        <div class="progress-bar" id="attendanceQualityFill" role="progressbar" style="width: 0%; background: #28a745;"></div>
+                    <!-- Face position indicator -->
+                    <div class="mt-2 d-flex justify-content-center gap-3">
+                        <div id="positionIndicator" class="small">
+                            <span class="badge bg-secondary">⬆️⬇️⬅️➡️</span>
+                        </div>
+                        <div id="livenessStatus" class="small" style="display: none;">
+                            <span class="badge bg-info">👁️ Liveness: Checking...</span>
+                        </div>
                     </div>
                     
+                    <div id="attendanceFaceStatus" class="mt-3 fw-bold"></div>
+                    
+                    <!-- Quality Bar -->
+                    <div class="progress mt-2" id="attendanceQualityBar" style="height: 8px; display: none;">
+                        <div class="progress-bar" id="attendanceQualityFill" role="progressbar" style="width: 0%; background: #28a745;"></div>
+                    </div>
+                    <div id="attendanceQualityText" class="small text-muted mt-1" style="display: none;"></div>
+                    
+                    <!-- Liveness indicators -->
+                    <div id="livenessIcons" class="mt-2 d-flex justify-content-center gap-3" style="display: none;">
+                        <span id="eyeIcon1" class="badge bg-secondary">👁️</span>
+                        <span id="eyeIcon2" class="badge bg-secondary">👁️</span>
+                        <span id="blinkIcon" class="badge bg-secondary">👀</span>
+                    </div>
+                    
+                    <!-- Debug Info -->
+                    <div id="debugInfo" class="mt-3 p-2 bg-dark text-light rounded" style="display: block; font-size: 12px; text-align: left; max-height: 200px; overflow-y: auto;"></div>
+                    
+                    <!-- Match Result Display -->
+                    <div id="attendanceMatchResult" class="mt-3" style="display: none;"></div>
+                    
+                    <!-- Employee Info Display -->
+                    <div id="attendanceEmployeeInfo" class="mt-3 p-3 bg-light rounded" style="display: none;">
+                        <h5>👤 Employee Identified</h5>
+                        <p class="mb-1"><strong>Name:</strong> <span id="identifiedEmployeeName"></span></p>
+                        <p class="mb-1"><strong>ID:</strong> <span id="identifiedEmployeeId"></span></p>
+                    </div>
+                    
+                    <!-- Final Result Display -->
                     <div id="attendanceResult" class="mt-3"></div>
                     
-                    <canvas id="cropCanvas" style="display:none;"></canvas>
+                    <!-- Manual Retry Button -->
+                    <button id="retryButton" class="btn btn-warning mt-3" style="display: none;" onclick="resetForRetry()">
+                        <i class="fas fa-redo-alt me-2"></i>Try Again
+                    </button>
+                    
+                    <canvas id="cropCanvas" style="display:none; width: 400px; height: 400px;"></canvas>
                     <canvas id="attendanceCanvas" style="display:none;"></canvas>
                     <img id="attendanceSnapshot" style="max-width:100%; border-radius:10px; display:none;" class="mt-2">
                 </div>
@@ -52,8 +119,52 @@
     .camera-container { position: relative; width: 100%; height: 350px; background: #000; border-radius: 15px; overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,0.2); }
     .flash-message { animation: flash 0.2s ease-out; }
     @keyframes flash { 0% { opacity: 1; } 50% { opacity: 0.3; } 100% { opacity: 1; } }
-    .match-found { border-color: #28a745 !important; background-color: rgba(40, 167, 69, 0.2); }
-    .recognizing { border-color: #ffc107 !important; background-color: rgba(255, 193, 7, 0.2); }
+    
+    #attendanceFaceGuide.face-detected {
+        border-color: #ffc107 !important;
+        box-shadow: 0 0 0 2000px rgba(128, 128, 128, 0.95), 0 0 30px #ffc107;
+        animation: pulse-yellow 1.5s infinite;
+    }
+    #attendanceFaceGuide.capturing {
+        border-color: #17a2b8 !important;
+        box-shadow: 0 0 0 2000px rgba(128, 128, 128, 0.95), 0 0 30px #17a2b8;
+        animation: pulse-blue 0.5s infinite;
+    }
+    #attendanceFaceGuide.match-found {
+        border-color: #28a745 !important;
+        box-shadow: 0 0 0 2000px rgba(128, 128, 128, 0.95), 0 0 30px #28a745;
+        animation: pulse-green 1s infinite;
+    }
+    #attendanceFaceGuide.no-match {
+        border-color: #dc3545 !important;
+        box-shadow: 0 0 0 2000px rgba(128, 128, 128, 0.95), 0 0 30px #dc3545;
+    }
+    #attendanceFaceGuide.position-good {
+        border-color: #28a745 !important;
+    }
+    #attendanceFaceGuide.position-fair {
+        border-color: #ffc107 !important;
+    }
+    #attendanceFaceGuide.position-poor {
+        border-color: #dc3545 !important;
+    }
+    
+    @keyframes pulse-yellow {
+        0% { box-shadow: 0 0 0 2000px rgba(128, 128, 128, 0.95), 0 0 20px #ffc107; }
+        50% { box-shadow: 0 0 0 2000px rgba(128, 128, 128, 0.95), 0 0 40px #ffc107; }
+        100% { box-shadow: 0 0 0 2000px rgba(128, 128, 128, 0.95), 0 0 20px #ffc107; }
+    }
+    @keyframes pulse-blue {
+        0% { box-shadow: 0 0 0 2000px rgba(128, 128, 128, 0.95), 0 0 20px #17a2b8; }
+        50% { box-shadow: 0 0 0 2000px rgba(128, 128, 128, 0.95), 0 0 50px #17a2b8; }
+        100% { box-shadow: 0 0 0 2000px rgba(128, 128, 128, 0.95), 0 0 20px #17a2b8; }
+    }
+    @keyframes pulse-green {
+        0% { box-shadow: 0 0 0 2000px rgba(128, 128, 128, 0.95), 0 0 20px #28a745; }
+        50% { box-shadow: 0 0 0 2000px rgba(128, 128, 128, 0.95), 0 0 50px #28a745; }
+        100% { box-shadow: 0 0 0 2000px rgba(128, 128, 128, 0.95), 0 0 20px #28a745; }
+    }
+    
     #attendanceStatusOverlay { transition: all 0.3s ease; }
     #startCameraBtn {
         padding: 15px 40px;
@@ -63,12 +174,36 @@
     #startCameraBtn:hover {
         transform: scale(1.05);
     }
+    .identified-employee {
+        background: linear-gradient(135deg, #28a745, #20c997);
+        color: white;
+        padding: 20px;
+        border-radius: 15px;
+        animation: slideIn 0.5s ease-out;
+    }
+    @keyframes slideIn {
+        from { transform: translateY(-20px); opacity: 0; }
+        to { transform: translateY(0); opacity: 1; }
+    }
+    #debugInfo {
+        max-height: 200px;
+        overflow-y: auto;
+        font-family: monospace;
+    }
+    .blink-animation {
+        animation: blink 0.5s ease;
+    }
+    @keyframes blink {
+        0% { opacity: 1; }
+        50% { opacity: 0.3; }
+        100% { opacity: 1; }
+    }
 </style>
 
 <script>
 let attendanceStream = null;
 let isProcessing = false;
-let hasCaptured = false;
+let hasMarked = false;
 let isSubmitting = false;
 let detectionFrame = null;
 let lastDetectionTime = 0;
@@ -76,12 +211,19 @@ let consecutiveGoodFrames = 0;
 let matchFoundFrame = null;
 let captureTimeout = null;
 let currentEmployee = null;
+let noFaceTimer = null;
+let stableStartTime = null;
+let captureAttempts = 0;
+let recognitionActive = true;
+let livenessCheckPassed = false;
+let lastBlinkTime = 0;
+let blinkDetected = false;
 
-const DETECTION_THROTTLE_MS = 200;
-const FRAME_WIDTH = 198;
-const FRAME_HEIGHT = 252;
-const REQUIRED_GOOD_FRAMES = 5;
-const MIN_QUALITY = 0.30;
+const DETECTION_THROTTLE_MS = 100;
+const REQUIRED_GOOD_FRAMES = 2;
+const MIN_QUALITY = 0.20;
+const CAPTURE_DELAY = 300;
+const POSITION_THRESHOLD = 0.3; // How centered the face should be
 
 const startButtonContainer = document.getElementById('startButtonContainer');
 const attendanceCameraSection = document.getElementById('attendanceCameraSection');
@@ -91,47 +233,179 @@ const cropCanvas = document.getElementById('cropCanvas');
 const attendanceResult = document.getElementById('attendanceResult');
 const attendanceQualityBar = document.getElementById('attendanceQualityBar');
 const attendanceQualityFill = document.getElementById('attendanceQualityFill');
+const attendanceQualityText = document.getElementById('attendanceQualityText');
 const attendanceFaceStatus = document.getElementById('attendanceFaceStatus');
 const attendanceFaceGuide = document.getElementById('attendanceFaceGuide');
 const attendanceFaceGuideLabel = document.getElementById('attendanceFaceGuideLabel');
 const attendanceStatusOverlay = document.getElementById('attendanceStatusOverlay');
+const attendanceProgressBar = document.getElementById('attendanceProgressBar');
+const attendanceProgressFill = document.getElementById('attendanceProgressFill');
+const attendanceMatchResult = document.getElementById('attendanceMatchResult');
+const attendanceEmployeeInfo = document.getElementById('attendanceEmployeeInfo');
+const identifiedEmployeeName = document.getElementById('identifiedEmployeeName');
+const identifiedEmployeeId = document.getElementById('identifiedEmployeeId');
+const autoCaptureIndicator = document.getElementById('autoCaptureIndicator');
+const livenessIndicator = document.getElementById('livenessIndicator');
+const livenessStatus = document.getElementById('livenessStatus');
+const livenessIcons = document.getElementById('livenessIcons');
+const eyeIcon1 = document.getElementById('eyeIcon1');
+const eyeIcon2 = document.getElementById('eyeIcon2');
+const blinkIcon = document.getElementById('blinkIcon');
+const positionWarning = document.getElementById('positionWarning');
+const positionIndicator = document.getElementById('positionIndicator');
+const retryButton = document.getElementById('retryButton');
+const debugInfo = document.getElementById('debugInfo');
+
+function logDebug(message) {
+    const timestamp = new Date().toLocaleTimeString();
+    debugInfo.innerHTML += `<div>${timestamp}: ${message}</div>`;
+    debugInfo.scrollTop = debugInfo.scrollHeight;
+    console.log(message);
+}
+
+function updatePositionIndicator(offsetX, offsetY) {
+    const distance = Math.sqrt(offsetX * offsetX + offsetY * offsetY);
+    
+    if (distance < 0.1) {
+        attendanceFaceGuide.classList.add('position-good');
+        attendanceFaceGuide.classList.remove('position-fair', 'position-poor');
+        positionWarning.style.display = 'none';
+        positionIndicator.innerHTML = '<span class="badge bg-success">✅ Perfect position</span>';
+    } else if (distance < 0.2) {
+        attendanceFaceGuide.classList.add('position-fair');
+        attendanceFaceGuide.classList.remove('position-good', 'position-poor');
+        positionWarning.style.display = 'none';
+        positionIndicator.innerHTML = '<span class="badge bg-warning">⚠️ Slight adjustment needed</span>';
+    } else {
+        attendanceFaceGuide.classList.add('position-poor');
+        attendanceFaceGuide.classList.remove('position-good', 'position-fair');
+        positionWarning.style.display = 'block';
+        
+        let direction = '';
+        if (Math.abs(offsetX) > Math.abs(offsetY)) {
+            direction = offsetX > 0 ? '← Move left' : '→ Move right';
+        } else {
+            direction = offsetY > 0 ? '↑ Move up' : '↓ Move down';
+        }
+        positionWarning.innerHTML = `⚠️ ${direction}`;
+        positionIndicator.innerHTML = `<span class="badge bg-danger">❌ Poor position - ${direction}</span>`;
+    }
+}
+
+function updateLivenessIndicators(eyesDetected, blinking) {
+    if (eyesDetected) {
+        eyeIcon1.className = 'badge bg-success';
+        eyeIcon2.className = 'badge bg-success';
+    } else {
+        eyeIcon1.className = 'badge bg-secondary';
+        eyeIcon2.className = 'badge bg-secondary';
+    }
+    
+    if (blinking) {
+        blinkIcon.className = 'badge bg-warning';
+        blinkIcon.classList.add('blink-animation');
+        setTimeout(() => {
+            blinkIcon.classList.remove('blink-animation');
+        }, 500);
+    } else {
+        blinkIcon.className = 'badge bg-secondary';
+    }
+}
 
 function closeCameraSection() {
-    // Stop camera and hide camera section
+    logDebug('Closing camera section');
     stopAttendanceCamera();
     attendanceCameraSection.style.display = 'none';
     startButtonContainer.style.display = 'block';
-    
-    // Reset all states
+    recognitionActive = false;
+    resetStates();
+}
+
+function resetStates() {
     isProcessing = false;
-    hasCaptured = false;
+    hasMarked = false;
     isSubmitting = false;
     consecutiveGoodFrames = 0;
     matchFoundFrame = null;
     currentEmployee = null;
+    captureAttempts = 0;
+    stableStartTime = null;
+    livenessCheckPassed = false;
     
-    // Clear any results
     attendanceResult.innerHTML = '';
+    attendanceMatchResult.innerHTML = '';
+    attendanceMatchResult.style.display = 'none';
+    attendanceEmployeeInfo.style.display = 'none';
     attendanceFaceStatus.innerHTML = '';
     attendanceQualityFill.style.width = '0%';
+    attendanceQualityBar.style.display = 'none';
+    attendanceQualityText.style.display = 'none';
+    attendanceProgressBar.style.display = 'none';
+    livenessIcons.style.display = 'none';
+    livenessIndicator.style.display = 'none';
+    livenessStatus.style.display = 'none';
+    positionWarning.style.display = 'none';
+    retryButton.style.display = 'none';
+    attendanceFaceGuide.classList.remove('face-detected', 'capturing', 'match-found', 'no-match', 'position-good', 'position-fair', 'position-poor');
+    attendanceFaceGuideLabel.textContent = 'Position face here';
+    
+    if (noFaceTimer) {
+        clearTimeout(noFaceTimer);
+        noFaceTimer = null;
+    }
+    if (captureTimeout) {
+        clearTimeout(captureTimeout);
+        captureTimeout = null;
+    }
+}
+
+function resetForRetry() {
+    logDebug('Resetting for retry');
+    isProcessing = false;
+    hasMarked = false;
+    isSubmitting = false;
+    consecutiveGoodFrames = 0;
+    matchFoundFrame = null;
+    currentEmployee = null;
+    stableStartTime = null;
+    captureAttempts = 0;
+    livenessCheckPassed = false;
+    
+    attendanceResult.innerHTML = '';
+    attendanceMatchResult.style.display = 'none';
+    attendanceEmployeeInfo.style.display = 'none';
+    attendanceFaceStatus.innerHTML = '👤 Look at the camera';
+    attendanceFaceStatus.className = 'text-info';
+    attendanceFaceGuide.classList.remove('face-detected', 'match-found', 'no-match', 'capturing', 'position-good', 'position-fair', 'position-poor');
+    attendanceFaceGuideLabel.textContent = 'Position face here';
+    attendanceStatusOverlay.style.display = 'none';
+    attendanceSnapshot.style.display = 'none';
+    livenessIcons.style.display = 'none';
+    livenessIndicator.style.display = 'none';
+    livenessStatus.style.display = 'none';
+    positionWarning.style.display = 'none';
+    retryButton.style.display = 'none';
+    attendanceQualityFill.style.width = '0%';
+    attendanceQualityBar.style.display = 'none';
+    attendanceQualityText.style.display = 'none';
+    attendanceProgressBar.style.display = 'none';
+    
+    if (captureTimeout) {
+        clearTimeout(captureTimeout);
+        captureTimeout = null;
+    }
 }
 
 function startAttendanceCamera() {
-    // Hide start button and show camera section
+    logDebug('Starting camera');
     startButtonContainer.style.display = 'none';
     attendanceCameraSection.style.display = 'block';
-    
-    // Reset states
-    isProcessing = false;
-    hasCaptured = false;
-    isSubmitting = false;
-    consecutiveGoodFrames = 0;
-    matchFoundFrame = null;
-    currentEmployee = null;
-    attendanceResult.innerHTML = '';
+    recognitionActive = true;
+    resetStates();
     
     attendanceFaceStatus.innerHTML = '🔍 Initializing camera...';
     attendanceFaceStatus.className = 'text-info';
+    debugInfo.innerHTML = ''; // Clear debug log
     
     navigator.mediaDevices.getUserMedia({ 
         video: { 
@@ -141,20 +415,29 @@ function startAttendanceCamera() {
         } 
     })
     .then(stream => {
+        logDebug('Camera access granted');
         attendanceStream = stream;
         attendanceVideo.srcObject = stream;
         attendanceVideo.onloadedmetadata = () => {
-            attendanceFaceStatus.innerHTML = '👤 Look at the camera';
+            logDebug('Camera metadata loaded');
+            attendanceFaceStatus.innerHTML = '👤 Position your face in the oval';
             startAttendanceFaceDetection();
+            
+            noFaceTimer = setTimeout(() => {
+                if (!matchFoundFrame && !hasMarked && recognitionActive) {
+                    attendanceFaceStatus.innerHTML = '⚠️ No face detected. Please ensure good lighting.';
+                    attendanceFaceStatus.className = 'text-warning';
+                }
+            }, 5000);
         };
     })
     .catch(err => {
+        logDebug('Camera error: ' + err.message);
         attendanceResult.innerHTML = `
             <div class="alert alert-danger">
                 Camera access denied: ${err.message}
             </div>
         `;
-        // Show start button again if camera fails
         closeCameraSection();
     });
 }
@@ -172,19 +455,23 @@ function stopAttendanceCamera() {
         clearTimeout(captureTimeout);
         captureTimeout = null;
     }
+    if (noFaceTimer) {
+        clearTimeout(noFaceTimer);
+        noFaceTimer = null;
+    }
 }
 
 async function detectFaceWithAPI() {
-    if (!attendanceVideo || !attendanceVideo.videoWidth || isProcessing || hasCaptured || isSubmitting) return null;
+    if (!attendanceVideo || !attendanceVideo.videoWidth || isProcessing || hasMarked || isSubmitting || !recognitionActive) return null;
     
     const now = Date.now();
     if (now - lastDetectionTime < DETECTION_THROTTLE_MS) return null;
     lastDetectionTime = now;
     
     const canvas = document.createElement('canvas');
-    canvas.width = attendanceVideo.videoWidth;
-    canvas.height = attendanceVideo.videoHeight;
-    canvas.getContext('2d').drawImage(attendanceVideo, 0, 0);
+    canvas.width = 320;
+    canvas.height = 240;
+    canvas.getContext('2d').drawImage(attendanceVideo, 0, 0, canvas.width, canvas.height);
     const imageData = canvas.toDataURL('image/jpeg', 0.8);
     
     try {
@@ -194,28 +481,69 @@ async function detectFaceWithAPI() {
             body: JSON.stringify({image: imageData})
         });
         if (!response.ok) return null;
-        return await response.json();
+        const result = await response.json();
+        
+        // Simulate liveness detection (in production, use a real liveness API)
+        if (result.face_detected) {
+            // Random blink detection for demo (replace with actual blink detection)
+            const now = Date.now();
+            if (now - lastBlinkTime > 3000) {
+                blinkDetected = Math.random() > 0.7;
+                if (blinkDetected) {
+                    lastBlinkTime = now;
+                }
+            }
+            
+            // Update liveness indicators
+            livenessIcons.style.display = 'flex';
+            livenessIndicator.style.display = 'block';
+            livenessStatus.style.display = 'block';
+            updateLivenessIndicators(true, blinkDetected);
+        }
+        
+        return result;
     } catch (error) {
-        console.error('Face detection error:', error);
+        logDebug('Face detection error: ' + error.message);
         return null;
     }
 }
 
 async function matchFaceWithAPI(imageData) {
     try {
+        logDebug('Sending match request to server');
+        
+        // First verify the face is detected in the image
+        const detectResponse = await fetch('/detect_face', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({image: imageData})
+        });
+        
+        const detectResult = await detectResponse.json();
+        logDebug(`Face detection in cropped image: ${JSON.stringify(detectResult)}`);
+        
+        if (!detectResult.face_detected) {
+            logDebug('No face detected in cropped image - trying with larger crop');
+            return null;
+        }
+        
         const response = await fetch('/match_face', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({image: imageData})
         });
+        
         if (!response.ok) {
             const errorText = await response.text();
-            console.error('Match face error response:', errorText);
+            logDebug('Match face error response: ' + errorText);
             return null;
         }
-        return await response.json();
+        
+        const result = await response.json();
+        logDebug('Match result: ' + JSON.stringify(result));
+        return result;
     } catch (error) {
-        console.error('Face matching error:', error);
+        logDebug('Face matching error: ' + error.message);
         return null;
     }
 }
@@ -224,24 +552,74 @@ function cropFaceFromFrame() {
     const video = attendanceVideo;
     const videoWidth = video.videoWidth;
     const videoHeight = video.videoHeight;
+    
+    if (!videoWidth || !videoHeight) {
+        logDebug('Video not ready');
+        return null;
+    }
+    
+    logDebug(`Video dimensions: ${videoWidth}x${videoHeight}`);
+    
     const rect = attendanceVideo.getBoundingClientRect();
     const guideRect = attendanceFaceGuide.getBoundingClientRect();
+    
     const scaleX = videoWidth / rect.width;
     const scaleY = videoHeight / rect.height;
-    const guideLeft = (guideRect.left - rect.left) * scaleX;
-    const guideTop = (guideRect.top - rect.top) * scaleY;
-    const guideWidth = guideRect.width * scaleX;
-    const guideHeight = guideRect.height * scaleY;
     
-    cropCanvas.width = FRAME_WIDTH;
-    cropCanvas.height = FRAME_HEIGHT;
-    cropCanvas.getContext('2d').drawImage(video, guideLeft, guideTop, guideWidth, guideHeight, 0, 0, cropCanvas.width, cropCanvas.height);
-    return cropCanvas.toDataURL('image/jpeg', 0.9);
+    // Get guide position in video coordinates
+    let guideLeft = (guideRect.left - rect.left) * scaleX;
+    let guideTop = (guideRect.top - rect.top) * scaleY;
+    let guideWidth = guideRect.width * scaleX;
+    let guideHeight = guideRect.height * scaleY;
+    
+    // Calculate face position relative to guide
+    const faceCenterX = guideLeft + guideWidth / 2;
+    const faceCenterY = guideTop + guideHeight / 2;
+    const videoCenterX = videoWidth / 2;
+    const videoCenterY = videoHeight / 2;
+    
+    const offsetX = (faceCenterX - videoCenterX) / videoWidth;
+    const offsetY = (faceCenterY - videoCenterY) / videoHeight;
+    
+    updatePositionIndicator(offsetX, offsetY);
+    
+    // Add padding (make crop area larger)
+    const padding = 0.5;
+    const paddedLeft = Math.max(0, guideLeft - (guideWidth * padding));
+    const paddedTop = Math.max(0, guideTop - (guideHeight * padding));
+    const paddedWidth = Math.min(videoWidth - paddedLeft, guideWidth * (1 + padding * 2));
+    const paddedHeight = Math.min(videoHeight - paddedTop, guideHeight * (1 + padding * 2));
+    
+    logDebug(`Crop area: ${Math.round(paddedLeft)}x${Math.round(paddedTop)} ${Math.round(paddedWidth)}x${Math.round(paddedHeight)}`);
+    
+    // Use larger canvas for better quality
+    cropCanvas.width = 400;
+    cropCanvas.height = 400;
+    
+    const ctx = cropCanvas.getContext('2d');
+    ctx.fillStyle = '#FFFFFF';
+    ctx.fillRect(0, 0, cropCanvas.width, cropCanvas.height);
+    
+    ctx.drawImage(
+        video,
+        paddedLeft, paddedTop, paddedWidth, paddedHeight,
+        0, 0, cropCanvas.width, cropCanvas.height
+    );
+    
+    const imageData = cropCanvas.toDataURL('image/jpeg', 0.95);
+    logDebug(`Face cropped successfully, size: ${Math.round(imageData.length / 1024)}KB`);
+    
+    return imageData;
 }
 
 async function startAttendanceFaceDetection() {
     const detectFaces = async () => {
-        if (isProcessing || hasCaptured || isSubmitting) {
+        if (!recognitionActive) {
+            detectionFrame = requestAnimationFrame(detectFaces);
+            return;
+        }
+        
+        if (isProcessing || hasMarked || isSubmitting) {
             detectionFrame = requestAnimationFrame(detectFaces);
             return;
         }
@@ -249,73 +627,168 @@ async function startAttendanceFaceDetection() {
         const result = await detectFaceWithAPI();
         
         if (result && result.face_detected) {
+            if (noFaceTimer) {
+                clearTimeout(noFaceTimer);
+                noFaceTimer = null;
+            }
+            
+            attendanceQualityBar.style.display = 'block';
+            attendanceQualityText.style.display = 'block';
             const qualityPercent = Math.round(result.quality * 100);
             attendanceQualityFill.style.width = `${qualityPercent}%`;
+            attendanceQualityText.textContent = `Quality: ${qualityPercent}%`;
+            
+            logDebug(`Face detected - Quality: ${qualityPercent}%`);
             
             if (result.quality >= MIN_QUALITY) {
                 attendanceQualityFill.style.background = '#28a745';
-                attendanceFaceGuide.style.borderColor = '#28a745';
+                attendanceFaceGuide.classList.add('face-detected');
                 consecutiveGoodFrames++;
                 
                 attendanceFaceStatus.innerHTML = `✅ Face detected (${qualityPercent}% quality)`;
                 attendanceFaceStatus.className = 'text-success';
-                attendanceFaceGuideLabel.textContent = '✅ Processing...';
+                attendanceFaceGuideLabel.textContent = '✅ Detected';
                 
                 if (consecutiveGoodFrames >= REQUIRED_GOOD_FRAMES && !matchFoundFrame) {
-                    matchFoundFrame = true;
-                    isProcessing = true;
-                    
-                    attendanceFaceStatus.innerHTML = '🔍 Matching with registered employees...';
-                    attendanceStatusOverlay.style.display = 'block';
-                    attendanceStatusOverlay.innerHTML = '🔍 Searching for match...';
-                    
-                    const croppedImageData = cropFaceFromFrame();
-                    
-                    const matchResult = await matchFaceWithAPI(croppedImageData);
-                    
-                    if (matchResult && matchResult.match_found) {
-                        currentEmployee = matchResult.employee;
-                        attendanceStatusOverlay.innerHTML = `✅ Match found: ${currentEmployee.name}`;
-                        attendanceStatusOverlay.style.background = 'rgba(40, 167, 69, 0.9)';
-                        
-                        attendanceFaceStatus.innerHTML = `✅ Matched with ${currentEmployee.name} (${matchResult.confidence}%)`;
-                        
-                        captureTimeout = setTimeout(() => {
-                            captureImmediately(currentEmployee.employeeid, croppedImageData);
-                        }, 1000);
+                    if (!stableStartTime) {
+                        stableStartTime = Date.now();
+                        attendanceProgressBar.style.display = 'block';
+                        attendanceFaceGuideLabel.textContent = '⏳ Processing...';
                     } else {
-                        attendanceStatusOverlay.style.display = 'none';
-                        attendanceFaceStatus.innerHTML = '❌ No matching employee found';
-                        attendanceFaceStatus.className = 'text-danger';
-                        attendanceFaceGuide.style.borderColor = '#dc3545';
+                        const elapsed = Date.now() - stableStartTime;
+                        const progress = Math.min((elapsed / CAPTURE_DELAY) * 100, 100);
+                        attendanceProgressFill.style.width = `${progress}%`;
                         
-                        setTimeout(() => {
-                            isProcessing = false;
-                            matchFoundFrame = null;
-                            consecutiveGoodFrames = 0;
-                            attendanceStatusOverlay.style.display = 'none';
-                            attendanceFaceStatus.innerHTML = '👤 Look at the camera';
-                            attendanceFaceStatus.className = 'text-info';
-                        }, 3000);
+                        if (elapsed >= CAPTURE_DELAY) {
+                            logDebug('Stable face detected, attempting match');
+                            matchFoundFrame = true;
+                            isProcessing = true;
+                            attendanceProgressBar.style.display = 'none';
+                            
+                            attendanceFaceStatus.innerHTML = '🔍 Matching with registered employees...';
+                            attendanceStatusOverlay.style.display = 'block';
+                            attendanceStatusOverlay.innerHTML = '🔍 Searching for match...';
+                            
+                            const croppedImageData = cropFaceFromFrame();
+                            
+                            if (!croppedImageData) {
+                                logDebug('Face cropping failed');
+                                isProcessing = false;
+                                matchFoundFrame = null;
+                                consecutiveGoodFrames = 0;
+                                stableStartTime = null;
+                                attendanceStatusOverlay.style.display = 'none';
+                                return;
+                            }
+                            
+                            // Show preview
+                            attendanceSnapshot.src = croppedImageData;
+                            attendanceSnapshot.style.display = 'block';
+                            
+                            const matchResult = await matchFaceWithAPI(croppedImageData);
+                            
+                            if (matchResult && matchResult.match_found) {
+                                logDebug(`Match found! Employee: ${matchResult.employee.name}, Confidence: ${matchResult.confidence}%`);
+                                currentEmployee = matchResult.employee;
+                                const confidence = matchResult.confidence;
+                                
+                                attendanceFaceGuide.classList.remove('face-detected');
+                                attendanceFaceGuide.classList.add('match-found');
+                                attendanceFaceGuideLabel.textContent = `✅ ${currentEmployee.name}`;
+                                
+                                identifiedEmployeeName.textContent = currentEmployee.name;
+                                identifiedEmployeeId.textContent = currentEmployee.employeeid;
+                                attendanceEmployeeInfo.style.display = 'block';
+                                
+                                attendanceMatchResult.style.display = 'block';
+                                attendanceMatchResult.className = 'alert alert-success mt-3';
+                                attendanceMatchResult.innerHTML = `
+                                    <strong>✅ Identity Confirmed!</strong><br>
+                                    Name: ${currentEmployee.name}<br>
+                                    Confidence: ${confidence}%
+                                `;
+                                
+                                attendanceStatusOverlay.innerHTML = `✅ Found: ${currentEmployee.name}`;
+                                attendanceStatusOverlay.style.background = 'rgba(40, 167, 69, 0.9)';
+                                
+                                captureTimeout = setTimeout(() => {
+                                    captureImmediately(currentEmployee.employeeid, croppedImageData);
+                                }, 1000);
+                            } else {
+                                captureAttempts++;
+                                logDebug(`No match found (attempt ${captureAttempts}/3)`);
+                                
+                                if (matchResult && matchResult.error === "No face detected") {
+                                    logDebug('The cropped image had no detectable face - adjusting crop area');
+                                }
+                                
+                                attendanceFaceGuide.classList.remove('face-detected');
+                                attendanceFaceGuide.classList.add('no-match');
+                                attendanceFaceGuideLabel.textContent = '❌ No match';
+                                
+                                attendanceStatusOverlay.style.display = 'none';
+                                attendanceMatchResult.style.display = 'block';
+                                attendanceMatchResult.className = 'alert alert-danger mt-3';
+                                
+                                if (captureAttempts >= 3) {
+                                    attendanceMatchResult.innerHTML = `
+                                        <strong>❌ Face not recognized after multiple attempts.</strong><br>
+                                        Please ensure you are registered or try again.
+                                    `;
+                                    attendanceFaceStatus.innerHTML = '❌ Recognition failed';
+                                    retryButton.style.display = 'block';
+                                } else {
+                                    attendanceMatchResult.innerHTML = `
+                                        <strong>❌ Face not recognized.</strong><br>
+                                        Attempt ${captureAttempts}/3
+                                    `;
+                                    attendanceFaceStatus.innerHTML = `❌ No match (attempt ${captureAttempts}/3)`;
+                                }
+                                
+                                setTimeout(() => {
+                                    isProcessing = false;
+                                    matchFoundFrame = null;
+                                    consecutiveGoodFrames = 0;
+                                    stableStartTime = null;
+                                    attendanceFaceGuide.classList.remove('no-match');
+                                    attendanceFaceGuideLabel.textContent = 'Position face here';
+                                    attendanceMatchResult.style.display = 'none';
+                                    attendanceSnapshot.style.display = 'none';
+                                    if (captureAttempts < 3) {
+                                        attendanceFaceStatus.innerHTML = '👤 Try again - Position face in oval';
+                                        attendanceFaceStatus.className = 'text-info';
+                                    }
+                                }, 2000);
+                            }
+                        }
                     }
                 }
             } else {
                 attendanceQualityFill.style.background = '#ffc107';
-                attendanceFaceGuide.style.borderColor = '#ffc107';
+                attendanceFaceGuide.classList.add('face-detected');
                 attendanceFaceStatus.innerHTML = `⚠️ Low quality (${qualityPercent}%) - Move closer`;
                 attendanceFaceStatus.className = 'text-warning';
                 attendanceFaceGuideLabel.textContent = '⚠️ Low quality';
                 consecutiveGoodFrames = 0;
                 matchFoundFrame = null;
+                stableStartTime = null;
+                attendanceProgressBar.style.display = 'none';
             }
         } else {
-            attendanceQualityFill.style.width = '0%';
-            attendanceFaceGuide.style.borderColor = 'rgba(255, 255, 255, 0.9)';
+            attendanceQualityBar.style.display = 'none';
+            attendanceQualityText.style.display = 'none';
+            attendanceFaceGuide.classList.remove('face-detected', 'match-found', 'no-match', 'capturing', 'position-good', 'position-fair', 'position-poor');
             attendanceFaceStatus.innerHTML = '👤 No face detected';
             attendanceFaceStatus.className = 'text-muted';
-            attendanceFaceGuideLabel.textContent = 'Look here';
+            attendanceFaceGuideLabel.textContent = 'Position face here';
             consecutiveGoodFrames = 0;
             matchFoundFrame = null;
+            stableStartTime = null;
+            attendanceProgressBar.style.display = 'none';
+            livenessIcons.style.display = 'none';
+            livenessIndicator.style.display = 'none';
+            livenessStatus.style.display = 'none';
+            positionWarning.style.display = 'none';
         }
         
         detectionFrame = requestAnimationFrame(detectFaces);
@@ -325,16 +798,19 @@ async function startAttendanceFaceDetection() {
 }
 
 function captureImmediately(empid, imageData) {
-    if (hasCaptured || isSubmitting) return;
-    hasCaptured = true;
+    if (hasMarked || isSubmitting) return;
+    logDebug(`Capturing attendance for employee ${empid}`);
+    hasMarked = true;
     
     attendanceSnapshot.src = imageData;
     attendanceSnapshot.style.display = 'block';
     attendanceVideo.classList.add('flash-message');
+    attendanceFaceGuide.classList.add('capturing');
     attendanceStatusOverlay.innerHTML = '📸 Capturing...';
     
     setTimeout(() => {
         attendanceVideo.classList.remove('flash-message');
+        attendanceFaceGuide.classList.remove('capturing');
         submitLiveAttendance(empid, imageData);
     }, 200);
 }
@@ -350,6 +826,8 @@ function submitLiveAttendance(empid, imageData) {
     attendanceStatusOverlay.innerHTML = '⏳ Recording attendance...';
     attendanceFaceStatus.innerHTML = '⏳ Processing...';
     
+    logDebug(`Submitting attendance for employee ${empid}`);
+    
     fetch('/live_attendance', { 
         method: 'POST', 
         body: formData,
@@ -357,6 +835,7 @@ function submitLiveAttendance(empid, imageData) {
     })
     .then(async response => {
         const text = await response.text();
+        logDebug(`Server response: ${text}`);
         if (!response.ok) {
             try {
                 const data = JSON.parse(text);
@@ -370,40 +849,68 @@ function submitLiveAttendance(empid, imageData) {
     .then(data => {
         if (data.status === 'ok') {
             const action = data.action === 'signed_in' ? 'Signed In' : 'Signed Out';
+            logDebug(`Attendance successful: ${action}`);
             attendanceResult.innerHTML = `
-                <div class="alert alert-success">
-                    <strong>✅ ${currentEmployee?.name || 'Employee'} ${action}!</strong><br>
-                    <small>Confidence: ${data.confidence}%</small>
-                </div>`;
+                <div class="alert alert-success identified-employee">
+                    <i class="fas fa-check-circle fa-3x mb-3"></i>
+                    <h4>✅ ${currentEmployee?.name || 'Employee'} ${action}!</h4>
+                    <p class="mb-1"><strong>ID:</strong> ${empid}</p>
+                    <p class="mb-1"><strong>Confidence:</strong> ${data.confidence}%</p>
+                    <p class="mb-1"><strong>Face Quality:</strong> ${data.face_quality}%</p>
+                    <small>${new Date().toLocaleTimeString()}</small>
+                </div>
+            `;
             attendanceStatusOverlay.innerHTML = `✅ ${action} successfully!`;
             attendanceStatusOverlay.style.background = 'rgba(40, 167, 69, 0.9)';
             
-            // Close the camera section after successful attendance
             setTimeout(() => {
-                closeCameraSection();
-            }, 2000);
+                isProcessing = false;
+                hasMarked = false;
+                isSubmitting = false;
+                matchFoundFrame = null;
+                consecutiveGoodFrames = 0;
+                stableStartTime = null;
+                attendanceSnapshot.style.display = 'none';
+                attendanceFaceStatus.innerHTML = '👤 Next person - Position face in oval';
+                attendanceFaceStatus.className = 'text-info';
+                attendanceStatusOverlay.style.display = 'none';
+                attendanceEmployeeInfo.style.display = 'none';
+                attendanceMatchResult.style.display = 'none';
+                attendanceFaceGuide.classList.remove('match-found', 'capturing');
+                attendanceFaceGuideLabel.textContent = 'Position face here';
+                captureAttempts = 0;
+                livenessIcons.style.display = 'none';
+                livenessIndicator.style.display = 'none';
+                livenessStatus.style.display = 'none';
+                positionWarning.style.display = 'none';
+            }, 3000);
         } else {
             throw new Error(data.msg || 'Unknown error');
         }
     })
     .catch(err => {
-        console.error('Submission error:', err);
+        logDebug('Submission error: ' + err.message);
         attendanceResult.innerHTML = `
             <div class="alert alert-danger">
                 <strong>❌ Failed:</strong> ${err.message}
             </div>`;
         attendanceStatusOverlay.style.display = 'none';
         
-        // Keep camera open on failure, but reset for another try
         setTimeout(() => {
             isProcessing = false;
-            hasCaptured = false;
+            hasMarked = false;
             isSubmitting = false;
             matchFoundFrame = null;
             consecutiveGoodFrames = 0;
+            stableStartTime = null;
             attendanceSnapshot.style.display = 'none';
-            attendanceFaceStatus.innerHTML = '👤 Try again - Look at the camera';
+            attendanceFaceStatus.innerHTML = '👤 Try again - Position face in oval';
             attendanceFaceStatus.className = 'text-info';
+            retryButton.style.display = 'none';
+            livenessIcons.style.display = 'none';
+            livenessIndicator.style.display = 'none';
+            livenessStatus.style.display = 'none';
+            positionWarning.style.display = 'none';
         }, 3000);
     });
 }

@@ -566,7 +566,7 @@ async function showEmployeeReceipt(id, employeeId) {
             role_color: roleColor,
             photo: imgElement ? imgElement.src : null,
             face_quality: qualityText,
-            created_at: "{{ now().strftime('%Y-%m-%d') }}"
+            created_at: "{{ now.strftime('%Y-%m-%d') }}"
         };
         
         currentEmployeeData = data;

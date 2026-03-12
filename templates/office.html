@@ -1,93 +1,227 @@
 {% extends "layout.html" %}
 {% block body %}
-<div class="row g-4">
-    <div class="col-12">
-        <div class="card shadow">
-            <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
-                <h3 class="card-title mb-0">
-                    <i class="fas fa-building me-2"></i>Office Today
-                </h3>
-                <span class="badge bg-light text-dark fs-6">{{ employees|length }} Currently In Office</span>
+<div class="container-fluid">
+    <!-- Header -->
+    <div class="row mb-4">
+        <div class="col-md-8">
+            <h2><i class="fas fa-building me-2"></i>Office Today</h2>
+            <p class="text-muted">Employees currently signed in</p>
+        </div>
+        <div class="col-md-4 text-end">
+            <div class="card bg-primary text-white">
+                <div class="card-body py-2">
+                    <h4 class="mb-0"><i class="fas fa-users me-2"></i>{{ employees|length }} Currently In Office</h4>
+                </div>
             </div>
-            <div class="card-body">
-                {% if employees %}
-                    <div class="alert alert-info mb-3">
-                        <i class="fas fa-info-circle me-2"></i>
-                        <strong>Click on any employee card</strong> to view detailed attendance receipt with PDF download and sharing options.
+        </div>
+    </div>
+
+    <!-- Search and Filter Section -->
+    <div class="card shadow-sm mb-4">
+        <div class="card-header bg-light">
+            <h5 class="mb-0"><i class="fas fa-search me-2"></i>Filter Employees</h5>
+        </div>
+        <div class="card-body">
+            <form method="get" class="row g-3" id="filterForm">
+                <div class="col-md-3">
+                    <label for="name" class="form-label">Employee Name</label>
+                    <input type="text" class="form-control" id="name" name="name" 
+                           placeholder="Search by name" value="{{ request.args.get('name', '') }}">
+                </div>
+                <div class="col-md-3">
+                    <label for="mda" class="form-label">MDA/Department</label>
+                    <input type="text" class="form-control" id="mda" name="mda" 
+                           placeholder="Search by MDA" value="{{ request.args.get('mda', '') }}">
+                </div>
+                <div class="col-md-2">
+                    <label for="date_from" class="form-label">From Date</label>
+                    <input type="date" class="form-control" id="date_from" name="date_from" 
+                           value="{{ request.args.get('date_from', '') }}">
+                </div>
+                <div class="col-md-2">
+                    <label for="date_to" class="form-label">To Date</label>
+                    <input type="date" class="form-control" id="date_to" name="date_to" 
+                           value="{{ request.args.get('date_to', '') }}">
+                </div>
+                <div class="col-md-2 d-flex align-items-end">
+                    <div class="btn-group w-100">
+                        <button type="submit" class="btn btn-primary">
+                            <i class="fas fa-filter me-1"></i>Filter
+                        </button>
+                        <a href="{{ url_for('office') }}" class="btn btn-secondary">
+                            <i class="fas fa-undo me-1"></i>Clear
+                        </a>
                     </div>
-                    
-                    {% for emp in employees %}
-                    <div class="row mb-3 p-3 border rounded bg-light office-row" 
-                         data-id="{{ emp.id }}" 
-                         data-employeeid="{{ emp.Employee.employeeid if emp.Employee else '' }}"
-                         data-name="{{ emp.employee_name }}"
-                         data-mda="{{ emp.mda }}"
-                         data-timein="{{ emp.time_in.strftime('%H:%M:%S') if emp.time_in else '' }}"
-                         data-signinimage="{{ emp.signin_image }}"
-                         data-regimage="{{ emp.Employee.registered_image if emp.Employee else '' }}"
-                         data-signinmatch="{{ emp.reg_signin_match }}"
-                         data-signinconfidence="{{ emp.signin_confidence }}"
-                         style="cursor: pointer; transition: all 0.2s;">
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Active Filters Display -->
+    {% if request.args.get('name') or request.args.get('mda') or request.args.get('date_from') or request.args.get('date_to') %}
+    <div class="alert alert-info mb-3">
+        <i class="fas fa-info-circle me-2"></i>
+        <strong>Active Filters:</strong>
+        {% if request.args.get('name') %} <span class="badge bg-primary me-2">Name: {{ request.args.get('name') }}</span> {% endif %}
+        {% if request.args.get('mda') %} <span class="badge bg-primary me-2">MDA: {{ request.args.get('mda') }}</span> {% endif %}
+        {% if request.args.get('date_from') %} <span class="badge bg-primary me-2">From: {{ request.args.get('date_from') }}</span> {% endif %}
+        {% if request.args.get('date_to') %} <span class="badge bg-primary me-2">To: {{ request.args.get('date_to') }}</span> {% endif %}
+        <a href="{{ url_for('office') }}" class="float-end text-decoration-none">Clear all</a>
+    </div>
+    {% endif %}
+
+    <!-- Summary Cards -->
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <div class="card bg-primary text-white">
+                <div class="card-body">
+                    <h6 class="text-white-50">Currently In Office</h6>
+                    <h3>{{ employees|length }}</h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-success text-white">
+                <div class="card-body">
+                    <h6 class="text-white-50">Departments</h6>
+                    <h3>{{ unique_mdas|length }}</h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-info text-white">
+                <div class="card-body">
+                    <h6 class="text-white-50">High Confidence</h6>
+                    <h3>{{ high_confidence_count }}</h3>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-warning text-white">
+                <div class="card-body">
+                    <h6 class="text-white-50">Avg Sign-in Time</h6>
+                    <h3>{{ avg_time or 'N/A' }}</h3>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Employees List -->
+    <div class="row g-4">
+        <div class="col-12">
+            <div class="card shadow">
+                <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                    <h3 class="card-title mb-0">
+                        <i class="fas fa-building me-2"></i>Office Today
+                    </h3>
+                    <span class="badge bg-light text-dark fs-6">{{ employees|length }} Currently In Office</span>
+                </div>
+                <div class="card-body">
+                    {% if employees %}
+                        <div class="alert alert-info mb-3">
+                            <i class="fas fa-info-circle me-2"></i>
+                            <strong>Click on any employee card</strong> to view detailed attendance receipt with PDF download and sharing options.
+                        </div>
                         
-                        <div class="col-md-2 text-center">
-                            <div class="avatar">
-                                {% if emp.Employee and emp.Employee.registered_image %}
-                                <img height="60" src="{{ url_for('uploads', filename=emp.Employee.registered_image.split('/')[-1]) }}" class="rounded-circle shadow-sm" alt="Registered Photo" onclick="showImage(this.src); event.stopPropagation();">
-                                {% else %}
-                                <div class="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center" style="width:60px;height:60px;font-size:1.2rem;">
-                                    {{ emp.employee_name.split(' ')[0][0] }}
+                        {% for emp in employees %}
+                        <div class="row mb-3 p-3 border rounded bg-light office-row" 
+                             id="emp-row-{{ emp.id }}"
+                             data-id="{{ emp.id }}" 
+                             data-employeeid="{{ emp.Employee.employeeid if emp.Employee else '' }}"
+                             data-name="{{ emp.employee_name }}"
+                             data-mda="{{ emp.mda }}"
+                             data-timein="{{ emp.time_in.strftime('%H:%M:%S') if emp.time_in else '' }}"
+                             data-signinimage="{{ emp.signin_image }}"
+                             data-regimage="{{ emp.Employee.registered_image if emp.Employee else '' }}"
+                             data-signinmatch="{{ emp.reg_signin_match }}"
+                             data-signinconfidence="{{ emp.signin_confidence }}"
+                             style="cursor: pointer; transition: all 0.2s;">
+                            
+                            <div class="col-md-2 text-center">
+                                <div class="avatar">
+                                    {% if emp.Employee and emp.Employee.registered_image %}
+                                    <img height="60" src="{{ url_for('uploads', filename=emp.Employee.registered_image) }}" class="rounded-circle shadow-sm" alt="Registered Photo" onclick="showImage(this.src); event.stopPropagation();">
+                                    {% else %}
+                                    <div class="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center" style="width:60px;height:60px;font-size:1.2rem;">
+                                        {{ emp.employee_name.split(' ')[0][0] if emp.employee_name else '?' }}
+                                    </div>
+                                    {% endif %}
                                 </div>
+                                <small class="text-muted mt-1 d-block">{{ emp.employee_name.split(' ')[0] if emp.employee_name else '' }}</small>
+                            </div>
+                            
+                            <div class="col-md-3">
+                                <strong>{{ emp.employee_name }}</strong><br>
+                                <small class="text-muted">{{ emp.mda or 'N/A' }}</small>
+                                <br>
+                                <small class="text-muted">ID: {{ emp.Employee.employeeid if emp.Employee else 'N/A' }}</small>
+                            </div>
+                            
+                            <div class="col-md-2">
+                                <strong>Sign In</strong><br>
+                                <span class="badge bg-success">{{ emp.time_in.strftime('%H:%M') if emp.time_in else '-' }}</span>
+                                {% if emp.signin_confidence %}
+                                <br><small class="text-muted">Conf: {{ (emp.signin_confidence * 100)|round }}%</small>
                                 {% endif %}
                             </div>
-                            <small class="text-muted mt-1 d-block">{{ emp.employee_name.split(' ')[0] }}</small>
+                            
+                            <div class="col-md-2">
+                                <strong>Sign Out</strong><br>
+                                <span class="badge bg-warning text-dark">⏳ Pending</span>
+                            </div>
+                            
+                            <div class="col-md-2">
+                                <div class="d-flex gap-1">
+                                    {% if emp.Employee and emp.Employee.registered_image %}
+                                    <img height="30" class="me-1 border rounded" src="{{ url_for('uploads', filename=emp.Employee.registered_image) }}" alt="Registered" onclick="showImage(this.src); event.stopPropagation();">
+                                    {% endif %}
+                                    {% if emp.signin_image %}
+                                    <img height="30" class="border rounded" src="{{ url_for('uploads', filename=emp.signin_image) }}" alt="Sign In" onclick="showImage(this.src); event.stopPropagation();">
+                                    {% endif %}
+                                </div>
+                            </div>
+                            
+                            <div class="col-md-1 text-center" onclick="event.stopPropagation();">
+                                <button class="btn btn-sm btn-outline-danger delete-office-btn" 
+                                        data-id="{{ emp.id }}"
+                                        data-name="{{ emp.employee_name }}">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </div>
                         </div>
-                        
-                        <div class="col-md-3">
-                            <strong>{{ emp.employee_name }}</strong><br>
-                            <small class="text-muted">{{ emp.mda or 'N/A' }}</small>
-                            <br>
-                            <small class="text-muted">ID: {{ emp.Employee.employeeid if emp.Employee else 'N/A' }}</small>
+                        {% endfor %}
+                    {% else %}
+                        <div class="text-center py-5">
+                            <i class="fas fa-building fa-4x text-muted mb-4"></i>
+                            <h4 class="text-muted">Office is Empty</h4>
+                            <p class="text-muted mb-4">No employees currently signed in.</p>
+                            {% if request.args.get('name') or request.args.get('mda') or request.args.get('date_from') or request.args.get('date_to') %}
+                            <p class="text-muted">No results match your filters. <a href="{{ url_for('office') }}">Clear filters</a></p>
+                            {% endif %}
+                            <a href="{{ url_for('live_attendance') }}" class="btn btn-primary">
+                                <i class="fas fa-camera me-2"></i>Take Attendance
+                            </a>
                         </div>
-                        
-                        <div class="col-md-2">
-                            <strong>Sign In</strong><br>
-                            <span class="badge bg-success">{{ emp.time_in.strftime('%H:%M') if emp.time_in else '-' }}</span>
-                            {% if emp.signin_confidence %}
-                            <br><small class="text-muted">Conf: {{ (emp.signin_confidence * 100)|round }}%</small>
+                    {% endif %}
+                </div>
+                {% if employees %}
+                <div class="card-footer text-muted">
+                    <div class="row">
+                        <div class="col">
+                            <i class="fas fa-users me-1"></i> Total: {{ employees|length }} employees
+                            {% if request.args.get('date_from') or request.args.get('date_to') %}
+                                | Date Range: 
+                                {% if request.args.get('date_from') %}{{ request.args.get('date_from') }}{% endif %}
+                                {% if request.args.get('date_to') %} to {{ request.args.get('date_to') }}{% endif %}
+                            {% else %}
+                                | Today: {{ today.strftime('%Y-%m-%d') }}
                             {% endif %}
                         </div>
-                        
-                        <div class="col-md-2">
-                            <strong>Sign Out</strong><br>
-                            <span class="badge bg-warning text-dark">⏳ Pending</span>
-                        </div>
-                        
-                        <div class="col-md-2">
-                            <div class="d-flex gap-1">
-                                {% if emp.Employee and emp.Employee.registered_image %}
-                                <img height="30" class="me-1 border rounded" src="{{ url_for('uploads', filename=emp.Employee.registered_image.split('/')[-1]) }}" alt="Registered" onclick="showImage(this.src); event.stopPropagation();">
-                                {% endif %}
-                                {% if emp.signin_image %}
-                                <img height="30" class="border rounded" src="{{ url_for('uploads', filename=emp.signin_image.split('/')[-1]) }}" alt="Sign In" onclick="showImage(this.src); event.stopPropagation();">
-                                {% endif %}
-                            </div>
-                        </div>
-                        
-                        <div class="col-md-1 text-center" onclick="event.stopPropagation();">
-                            <button class="btn btn-sm btn-outline-danger delete-office-btn" 
-                                    data-id="{{ emp.id }}"
-                                    data-name="{{ emp.employee_name }}">
-                                <i class="fas fa-trash"></i>
-                            </button>
+                        <div class="col text-end">
+                            <i class="fas fa-clock me-1"></i> Last updated: {{ now.strftime('%H:%M:%S') }}
                         </div>
                     </div>
-                    {% endfor %}
-                {% else %}
-                    <div class="text-center py-5">
-                        <i class="fas fa-building fa-4x text-muted mb-4"></i>
-                        <h4 class="text-muted">Office is Empty</h4>
-                        <p class="text-muted">No employees currently signed in</p>
-                    </div>
+                </div>
                 {% endif %}
             </div>
         </div>
@@ -152,18 +286,18 @@
 <div class="modal fade" id="deleteModal" tabindex="-1">
     <div class="modal-dialog">
         <div class="modal-content">
-            <div class="modal-header">
-                <h5 class="modal-title text-danger"><i class="fas fa-trash me-2"></i>Confirm Delete</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title"><i class="fas fa-trash me-2"></i>Confirm Delete</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
             </div>
             <div class="modal-body">
                 <p>Remove <strong id="deleteEmpName"></strong> from office?</p>
-                <p class="text-muted small">This deletes today's attendance record.</p>
+                <p class="text-muted small">This will delete today's attendance record. This action cannot be undone.</p>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
                 <button type="button" class="btn btn-danger" id="confirmDeleteBtn">
-                    <i class="fas fa-trash me-1"></i>Remove
+                    <i class="fas fa-trash me-1"></i>Remove Permanently
                 </button>
             </div>
         </div>
@@ -179,7 +313,7 @@
 let imageModal;
 let currentOfficeData = null;
 let currentReceiptElement = null;
-const MATCH_THRESHOLD = 55; // 55% threshold - UPDATED FROM 65%
+const MATCH_THRESHOLD = 55; // 55% threshold
 
 document.addEventListener('DOMContentLoaded', function() {
     imageModal = new bootstrap.Modal(document.getElementById('imageModal'));
@@ -210,6 +344,49 @@ document.addEventListener('DOMContentLoaded', function() {
             };
             
             showOfficeReceipt(data);
+        });
+    });
+    
+    // Delete functionality
+    const deleteBtns = document.querySelectorAll('.delete-office-btn');
+    const modal = new bootstrap.Modal(document.getElementById('deleteModal'));
+    const empNameEl = document.getElementById('deleteEmpName');
+    const confirmBtn = document.getElementById('confirmDeleteBtn');
+    let currentId = null;
+
+    deleteBtns.forEach(btn => {
+        btn.addEventListener('click', function() {
+            currentId = this.dataset.id;
+            empNameEl.textContent = this.dataset.name;
+            modal.show();
+        });
+    });
+
+    confirmBtn.addEventListener('click', function() {
+        if (!currentId) return;
+
+        fetch(`/office/delete/${currentId}`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'}
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.status === 'ok') {
+                const row = document.getElementById(`emp-row-${currentId}`);
+                row.style.transition = 'opacity 0.3s';
+                row.style.opacity = '0';
+                setTimeout(() => {
+                    row.remove();
+                    location.reload(); // Reload to update counts
+                }, 300);
+                modal.hide();
+            } else {
+                alert(data.msg || 'Error occurred');
+            }
+        })
+        .catch(err => {
+            alert('Network error');
+            console.error(err);
         });
     });
 });
@@ -307,20 +484,14 @@ function generateOfficeReceiptHTML(data) {
                 <div style="flex: 1; text-align: center;">
                     <strong>Registered</strong><br>
                     ${data.reg_image ? 
-                        `<img src="/uploads/${data.reg_image.split('/').pop()}" style="max-width: 100%; height: 100px; object-fit: cover; border-radius: 5px; border: 2px solid #0d6efd;" onclick="showImage('/uploads/${data.reg_image.split('/').pop()}')">` : 
+                        `<img src="/uploads/${data.reg_image}" style="max-width: 100%; height: 100px; object-fit: cover; border-radius: 5px; border: 2px solid #0d6efd;" onclick="showImage('/uploads/${data.reg_image}')">` : 
                         '<div style="background: #6c757d; color: white; padding: 10px; border-radius: 5px;">No Image</div>'}
                 </div>
                 <div style="flex: 1; text-align: center;">
                     <strong>Sign In</strong><br>
                     ${data.signin_image ? 
-                        `<img src="/uploads/${data.signin_image.split('/').pop()}" style="max-width: 100%; height: 100px; object-fit: cover; border-radius: 5px; ${!signinMatch ? 'border: 3px solid #dc3545;' : 'border: 2px solid #28a745;'}" onclick="showImage('/uploads/${data.signin_image.split('/').pop()}')">` : 
+                        `<img src="/uploads/${data.signin_image}" style="max-width: 100%; height: 100px; object-fit: cover; border-radius: 5px; ${!signinMatch ? 'border: 3px solid #dc3545;' : 'border: 2px solid #28a745;'}" onclick="showImage('/uploads/${data.signin_image}')">` : 
                         '<div style="background: #6c757d; color: white; padding: 10px; border-radius: 5px;">No Image</div>'}
-                </div>
-                <div style="flex: 1; text-align: center;">
-                    <strong>Sign Out</strong><br>
-                    <div style="background: #ffc107; color: #000; padding: 10px; border-radius: 5px;">
-                        ⏳ Pending
-                    </div>
                 </div>
             </div>
             
@@ -335,9 +506,6 @@ function generateOfficeReceiptHTML(data) {
                         </div>
                     </div>
                     <small>Match: ${signinMatch ? '✅' : '❌'} (Threshold: ${MATCH_THRESHOLD}%)</small>
-                </div>
-                <div style="margin-top: 10px;">
-                    <strong>Status:</strong> Currently signed in - waiting for sign out
                 </div>
             </div>
             
@@ -393,10 +561,6 @@ function shareOfficePDF(platform) {
     };
     
     html2pdf().set(opt).from(currentReceiptElement).outputPdf().then((pdfBlob) => {
-        // Create a blob URL
-        const blob = new Blob([pdfBlob], { type: 'application/pdf' });
-        const url = URL.createObjectURL(blob);
-        
         const signinMatch = parseFloat(currentOfficeData.signin_confidence) >= MATCH_THRESHOLD;
         
         if (platform === 'whatsapp') {
@@ -407,7 +571,7 @@ ID: ${currentOfficeData.employee_id || 'N/A'}
 MDA: ${currentOfficeData.mda || 'N/A'}
 ━━━━━━━━━━━━━━━━━━
 ⏰ Sign In Time: ${currentOfficeData.time_in}
-Status: Currently In Office (Pending Sign Out)
+Status: Currently In Office
 ━━━━━━━━━━━━━━━━━━
 🔍 Face Recognition:
 Sign In Confidence: ${currentOfficeData.signin_confidence}%
@@ -425,7 +589,7 @@ ID: ${currentOfficeData.employee_id || 'N/A'}
 MDA: ${currentOfficeData.mda || 'N/A'}
 ━━━━━━━━━━━━━━━━━━
 ⏰ Sign In Time: ${currentOfficeData.time_in}
-Status: Currently In Office (Pending Sign Out)
+Status: Currently In Office
 ━━━━━━━━━━━━━━━━━━
 🔍 Face Recognition:
 Sign In Confidence: ${currentOfficeData.signin_confidence}%
@@ -436,64 +600,14 @@ Match: ${signinMatch ? '✅' : '❌'} (Threshold: ${MATCH_THRESHOLD}%)
             downloadOfficePDF();
             
         } else if (platform === 'email') {
-            // Create mailto link with subject and body
             const subject = `Current Attendance: ${employeeName} - In Office`;
-            const body = `CURRENT ATTENDANCE STATUS\n\nEmployee: ${employeeName}\nID: ${currentOfficeData.employee_id || 'N/A'}\nMDA: ${currentOfficeData.mda || 'N/A'}\n\n⏰ Sign In Time: ${currentOfficeData.time_in}\nStatus: Currently In Office (Pending Sign Out)\n\n🔍 FACE RECOGNITION:\nSign In Confidence: ${currentOfficeData.signin_confidence}%\nMatch: ${signinMatch ? 'MATCH' : 'MISMATCH'}\nThreshold: ${MATCH_THRESHOLD}%\n\nThis is a real-time attendance status report.`;
+            const body = `CURRENT ATTENDANCE STATUS\n\nEmployee: ${employeeName}\nID: ${currentOfficeData.employee_id || 'N/A'}\nMDA: ${currentOfficeData.mda || 'N/A'}\n\n⏰ Sign In Time: ${currentOfficeData.time_in}\nStatus: Currently In Office\n\n🔍 FACE RECOGNITION:\nSign In Confidence: ${currentOfficeData.signin_confidence}%\nMatch: ${signinMatch ? 'MATCH' : 'MISMATCH'}\nThreshold: ${MATCH_THRESHOLD}%\n\nThis is a real-time attendance status report.`;
             window.location.href = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
             alert('PDF generated. Please attach the downloaded PDF to your email.');
             downloadOfficePDF();
         }
     });
 }
-
-// Delete functionality
-document.addEventListener('DOMContentLoaded', function() {
-    const deleteBtns = document.querySelectorAll('.delete-office-btn');
-    const modal = new bootstrap.Modal(document.getElementById('deleteModal'));
-    const empNameEl = document.getElementById('deleteEmpName');
-    const confirmBtn = document.getElementById('confirmDeleteBtn');
-    let currentId = null;
-
-    // Set modal data on button click
-    deleteBtns.forEach(btn => {
-        btn.addEventListener('click', function() {
-            currentId = this.dataset.id;
-            empNameEl.textContent = this.dataset.name;
-            modal.show();
-        });
-    });
-
-    // Handle delete confirmation
-    confirmBtn.addEventListener('click', function() {
-        if (!currentId) return;
-
-        fetch(`/office/delete/${currentId}`, {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'}
-        })
-        .then(res => res.json())
-        .then(data => {
-            if (data.status === 'ok') {
-                const row = document.getElementById(`emp-row-${currentId}`);
-                row.style.transition = 'opacity 0.3s';
-                row.style.opacity = '0';
-                setTimeout(() => {
-                    row.remove();
-                    const badge = document.querySelector('.badge');
-                    let count = parseInt(badge.textContent);
-                    badge.textContent = (count - 1) + (count > 1 ? ' Currently In Office' : ' Currently In Office');
-                }, 300);
-                modal.hide();
-            } else {
-                alert(data.msg || 'Error occurred');
-            }
-        })
-        .catch(err => {
-            alert('Network error');
-            console.error(err);
-        });
-    });
-});
 </script>
 
 <style>
@@ -517,6 +631,9 @@ document.addEventListener('DOMContentLoaded', function() {
 }
 .modal-lg {
     max-width: 700px;
+}
+.text-white-50 {
+    color: rgba(255, 255, 255, 0.7) !important;
 }
 </style>
 {% endblock %}

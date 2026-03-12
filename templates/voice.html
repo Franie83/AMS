@@ -1,0 +1,239 @@
+{% extends "layout.html" %}
+{% block body %}
+<div class="container mt-5">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card shadow text-center">
+                <div class="card-header bg-primary text-white">
+                    <h3><i class="fas fa-microphone-alt me-2"></i>Voice Command Center</h3>
+                </div>
+                <div class="card-body p-5">
+                    <div class="voice-animation mb-4">
+                        <div class="voice-circle mx-auto" id="voiceCircle">
+                            <i class="fas fa-microphone fa-4x" id="voiceIcon"></i>
+                        </div>
+                    </div>
+                    
+                    <h4 id="voicePrompt" class="mb-4">Click the button and speak a command</h4>
+                    
+                    <div class="alert alert-info" id="voiceResult" style="display: none;"></div>
+                    
+                    <div class="d-flex justify-content-center gap-3">
+                        <button class="btn btn-primary btn-lg" id="startVoiceBtn" onclick="startListening()">
+                            <i class="fas fa-microphone me-2"></i>Start Listening
+                        </button>
+                        <button class="btn btn-secondary btn-lg" id="stopVoiceBtn" onclick="stopListening()" style="display: none;">
+                            <i class="fas fa-stop me-2"></i>Stop
+                        </button>
+                    </div>
+                    
+                    <hr class="my-4">
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <h5>Available Commands:</h5>
+                            <ul class="list-group">
+                                <li class="list-group-item"><i class="fas fa-camera text-primary me-2"></i> "Take Attendance"</li>
+                                <li class="list-group-item"><i class="fas fa-video text-danger me-2"></i> "Live Attendance"</li>
+                                <li class="list-group-item"><i class="fas fa-user-plus text-success me-2"></i> "Register Employee"</li>
+                                <li class="list-group-item"><i class="fas fa-building text-info me-2"></i> "Office"</li>
+                            </ul>
+                        </div>
+                        <div class="col-md-6">
+                            <h5>More Commands:</h5>
+                            <ul class="list-group">
+                                <li class="list-group-item"><i class="fas fa-users text-warning me-2"></i> "Employees"</li>
+                                <li class="list-group-item"><i class="fas fa-chart-bar text-secondary me-2"></i> "Dashboard"</li>
+                                <li class="list-group-item"><i class="fas fa-calendar-alt text-dark me-2"></i> "Timesheet"</li>
+                                <li class="list-group-item"><i class="fas fa-sign-out-alt text-danger me-2"></i> "Logout"</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.voice-circle {
+    width: 150px;
+    height: 150px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    transition: all 0.3s ease;
+}
+
+.voice-circle.listening {
+    animation: pulse 1.5s infinite;
+    background: linear-gradient(135deg, #ff4b1f 0%, #ff9068 100%);
+}
+
+@keyframes pulse {
+    0% {
+        transform: scale(1);
+        box-shadow: 0 0 0 0 rgba(255, 75, 31, 0.7);
+    }
+    70% {
+        transform: scale(1.1);
+        box-shadow: 0 0 0 20px rgba(255, 75, 31, 0);
+    }
+    100% {
+        transform: scale(1);
+        box-shadow: 0 0 0 0 rgba(255, 75, 31, 0);
+    }
+}
+
+@keyframes listening {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.2); }
+    100% { transform: scale(1); }
+}
+
+.fa-microphone-alt {
+    animation: listening 1.5s infinite;
+}
+</style>
+
+<script>
+let recognition = null;
+let isListening = false;
+let voiceTimeout = null;
+
+function initVoiceRecognition() {
+    if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+        alert('Voice recognition is not supported in your browser. Please use Chrome or Edge.');
+        return false;
+    }
+    
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    recognition = new SpeechRecognition();
+    recognition.continuous = false;
+    recognition.interimResults = false;
+    recognition.lang = 'en-US';
+    
+    recognition.onstart = function() {
+        isListening = true;
+        document.getElementById('voiceCircle').classList.add('listening');
+        document.getElementById('voiceIcon').className = 'fas fa-microphone-alt fa-4x';
+        document.getElementById('voicePrompt').textContent = 'Listening... Speak now';
+        document.getElementById('startVoiceBtn').style.display = 'none';
+        document.getElementById('stopVoiceBtn').style.display = 'block';
+        document.getElementById('voiceResult').style.display = 'none';
+        
+        voiceTimeout = setTimeout(function() {
+            if (isListening) {
+                stopListening();
+                showResult('Timeout - please try again', 'warning');
+            }
+        }, 5000);
+    };
+    
+    recognition.onresult = function(event) {
+        const last = event.results.length - 1;
+        const command = event.results[last][0].transcript.trim().toLowerCase();
+        
+        console.log('Voice command detected:', command);
+        processVoiceCommand(command);
+    };
+    
+    recognition.onerror = function(event) {
+        console.error('Speech recognition error:', event.error);
+        showResult('Error: ' + event.error, 'danger');
+        stopListening();
+    };
+    
+    recognition.onend = function() {
+        stopListening();
+    };
+    
+    return true;
+}
+
+function startListening() {
+    if (!recognition) {
+        if (!initVoiceRecognition()) return;
+    }
+    
+    try {
+        recognition.start();
+    } catch (e) {
+        console.error('Failed to start recognition:', e);
+        showResult('Failed to start. Please try again.', 'danger');
+    }
+}
+
+function stopListening() {
+    if (recognition && isListening) {
+        try {
+            recognition.stop();
+        } catch (e) {}
+    }
+    
+    if (voiceTimeout) {
+        clearTimeout(voiceTimeout);
+        voiceTimeout = null;
+    }
+    
+    isListening = false;
+    document.getElementById('voiceCircle').classList.remove('listening');
+    document.getElementById('voiceIcon').className = 'fas fa-microphone fa-4x';
+    document.getElementById('voicePrompt').textContent = 'Click the button and speak a command';
+    document.getElementById('startVoiceBtn').style.display = 'block';
+    document.getElementById('stopVoiceBtn').style.display = 'none';
+}
+
+function showResult(message, type = 'info') {
+    const resultEl = document.getElementById('voiceResult');
+    resultEl.className = `alert alert-${type}`;
+    resultEl.innerHTML = message;
+    resultEl.style.display = 'block';
+    
+    setTimeout(() => {
+        resultEl.style.display = 'none';
+    }, 3000);
+}
+
+function processVoiceCommand(command) {
+    stopListening();
+    
+    const commands = {
+        'take attendance': '/take_attendance',
+        'attendance': '/take_attendance',
+        'live attendance': '/live_attendance',
+        'live': '/live_attendance',
+        'register employee': '/register',
+        'register': '/register',
+        'office': '/office',
+        'employees': '/employees',
+        'dashboard': '/dashboard',
+        'timesheet': '/timesheet',
+        'logout': '/logout'
+    };
+    
+    let destination = null;
+    for (let key in commands) {
+        if (command.includes(key)) {
+            destination = commands[key];
+            break;
+        }
+    }
+    
+    if (destination) {
+        showResult(`✅ Navigating to ${command}...`, 'success');
+        setTimeout(() => {
+            window.location.href = destination;
+        }, 1000);
+    } else {
+        showResult(`❌ Command not recognized: "${command}"`, 'danger');
+        setTimeout(() => {
+            document.getElementById('voicePrompt').textContent = 'Try again';
+        }, 2000);
+    }
+}
+</script>
+{% endblock %}

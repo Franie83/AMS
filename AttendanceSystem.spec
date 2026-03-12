@@ -1,15 +1,28 @@
 # -*- mode: python ; coding: utf-8 -*-
+from PyInstaller.utils.hooks import collect_submodules
 from PyInstaller.utils.hooks import collect_all
 
-datas = [('templates', 'templates'), ('uploads', 'uploads'), ('C:\\Users\\USER\\Documents\\apps\\AMS\\venv39\\lib\\site-packages\\face_recognition_models', 'face_recognition_models')]
+datas = [('templates', 'templates'), ('uploads', 'uploads')]
 binaries = []
-hiddenimports = ['face_recognition', 'face_recognition_models', 'dlib']
+hiddenimports = ['face_recognition', 'face_recognition_models', 'dlib', 'PIL', 'PIL._tkinter_finder', 'cv2', 'numpy', 'scipy', 'sklearn']
+hiddenimports += collect_submodules('face_recognition')
+hiddenimports += collect_submodules('dlib')
+hiddenimports += collect_submodules('cv2')
 tmp_ret = collect_all('face_recognition')
 datas += tmp_ret[0]; binaries += tmp_ret[1]; hiddenimports += tmp_ret[2]
 tmp_ret = collect_all('face_recognition_models')
 datas += tmp_ret[0]; binaries += tmp_ret[1]; hiddenimports += tmp_ret[2]
 tmp_ret = collect_all('dlib')
 datas += tmp_ret[0]; binaries += tmp_ret[1]; hiddenimports += tmp_ret[2]
+tmp_ret = collect_all('cv2')
+datas += tmp_ret[0]; binaries += tmp_ret[1]; hiddenimports += tmp_ret[2]
+tmp_ret = collect_all('numpy')
+datas += tmp_ret[0]; binaries += tmp_ret[1]; hiddenimports += tmp_ret[2]
+tmp_ret = collect_all('PIL')
+datas += tmp_ret[0]; binaries += tmp_ret[1]; hiddenimports += tmp_ret[2]
+
+
+block_cipher = None
 
 
 a = Analysis(
@@ -22,15 +35,18 @@ a = Analysis(
     hooksconfig={},
     runtime_hooks=[],
     excludes=[],
+    win_no_prefer_redirects=False,
+    win_private_assemblies=False,
+    cipher=block_cipher,
     noarchive=False,
-    optimize=0,
 )
-pyz = PYZ(a.pure)
+pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
 
 exe = EXE(
     pyz,
     a.scripts,
     a.binaries,
+    a.zipfiles,
     a.datas,
     [],
     name='AttendanceSystem',
