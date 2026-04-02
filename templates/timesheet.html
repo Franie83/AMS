@@ -150,7 +150,7 @@
     <div class="table-responsive">
         <table class="table table-hover table-bordered" id="timesheetTable">
             <thead class="table-dark">
-                <tr>
+                 <tr>
                     <th>ID</th>
                     <th>Name</th>
                     <th>MDA</th>
@@ -165,11 +165,11 @@
                     <th style="min-width: 150px;">Images</th>
                     <th>Status</th>
                     <th>Actions</th>
-                </tr>
+                 </tr>
             </thead>
             <tbody>
             {% for t in times %}
-                <tr class="timesheet-row" data-id="{{ t.id }}" style="cursor: pointer;">
+                <tr class="timesheet-row" data-id="{{ t.id }}" data-index="{{ loop.index0 }}" style="cursor: pointer;">
                     <td><strong>{{ t.id }}</strong></td>
                     <td>
                         {{ t.employee_name }}
@@ -377,7 +377,7 @@
     {% endif %}
 </div>
 
-<!-- Receipt Modal -->
+<!-- Receipt Modal with Navigation and Download -->
 <div class="modal fade" id="receiptModal" tabindex="-1" aria-labelledby="receiptModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-lg">
         <div class="modal-content">
@@ -385,6 +385,15 @@
                 <h5 class="modal-title" id="receiptModalLabel">
                     <i class="fas fa-receipt me-2"></i>ATTENDANCE DETAILS
                 </h5>
+                <!-- Navigation buttons at top right -->
+                <div class="btn-group me-2" role="group">
+                    <button type="button" class="btn btn-sm btn-outline-light" id="prevRecordBtn" onclick="navigateRecord('prev')">
+                        <i class="fas fa-chevron-left"></i> Prev
+                    </button>
+                    <button type="button" class="btn btn-sm btn-outline-light" id="nextRecordBtn" onclick="navigateRecord('next')">
+                        Next <i class="fas fa-chevron-right"></i>
+                    </button>
+                </div>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body" id="receiptContent">
@@ -396,7 +405,15 @@
                 </div>
             </div>
             <div class="modal-footer">
-                <div class="btn-group w-100" role="group">
+                <div class="btn-group me-auto" role="group">
+                    <button class="btn btn-secondary" onclick="goBackToTimesheetPage()">
+                        <i class="fas fa-arrow-left me-2"></i>Back to Timesheet
+                    </button>
+                    <button class="btn btn-primary" onclick="downloadReceiptAsJPG()">
+                        <i class="fas fa-download me-2"></i>Download as JPG
+                    </button>
+                </div>
+                <div class="btn-group" role="group">
                     <button class="btn btn-success" onclick="shareReceipt('whatsapp')">
                         <i class="fab fa-whatsapp me-2"></i>WhatsApp
                     </button>
@@ -410,7 +427,6 @@
                         <i class="fas fa-copy me-2"></i>Copy
                     </button>
                 </div>
-                <button type="button" class="btn btn-secondary w-100 mt-2" data-bs-dismiss="modal">Close</button>
             </div>
         </div>
     </div>
@@ -431,18 +447,31 @@
     </div>
 </div>
 
-<!-- Add Font Awesome if not already in layout -->
+<!-- Add Font Awesome and html2canvas -->
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
-<!-- html2pdf library -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 
 <script>
 let imageModal;
 let currentReceiptData = null;
 let currentReceiptElement = null;
+let currentRecordId = null;
+let allRecords = [];
 
 document.addEventListener('DOMContentLoaded', function() {
     imageModal = new bootstrap.Modal(document.getElementById('imageModal'));
+    
+    // Collect all record IDs from the table
+    document.querySelectorAll('.timesheet-row').forEach(row => {
+        allRecords.push({
+            id: parseInt(row.dataset.id),
+            index: parseInt(row.dataset.index),
+            element: row
+        });
+    });
+    
+    // Sort by ID
+    allRecords.sort((a, b) => a.id - b.id);
     
     // Make rows clickable
     document.querySelectorAll('.timesheet-row').forEach(row => {
@@ -455,11 +484,93 @@ document.addEventListener('DOMContentLoaded', function() {
                 e.target.tagName === 'IMG') {
                 return;
             }
-            const id = this.dataset.id;
+            const id = parseInt(this.dataset.id);
+            currentRecordId = id;
             showReceipt(id);
         });
     });
 });
+
+function goBackToTimesheetPage() {
+    const modal = bootstrap.Modal.getInstance(document.getElementById('receiptModal'));
+    modal.hide();
+    
+    const timesheetTable = document.getElementById('timesheetTable');
+    if (timesheetTable) {
+        timesheetTable.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+    
+    if (currentRecordId) {
+        const row = document.querySelector(`.timesheet-row[data-id="${currentRecordId}"]`);
+        if (row) {
+            row.style.transition = 'background-color 0.5s';
+            row.style.backgroundColor = '#fff3cd';
+            setTimeout(() => {
+                row.style.backgroundColor = '';
+            }, 2000);
+        }
+    }
+}
+
+function downloadReceiptAsJPG() {
+    const receiptElement = document.getElementById('receiptContent');
+    const originalContent = receiptElement.innerHTML;
+    
+    // Add a wrapper for better screenshot quality
+    receiptElement.style.backgroundColor = '#f8f9fa';
+    receiptElement.style.padding = '20px';
+    
+    html2canvas(receiptElement, {
+        scale: 2,
+        backgroundColor: '#ffffff',
+        logging: false,
+        useCORS: true
+    }).then(canvas => {
+        // Create download link
+        const link = document.createElement('a');
+        const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, '-');
+        link.download = `attendance_${currentRecordId}_${timestamp}.jpg`;
+        link.href = canvas.toDataURL('image/jpeg', 0.95);
+        link.click();
+        
+        // Restore original content
+        receiptElement.innerHTML = originalContent;
+        receiptElement.style.backgroundColor = '';
+        receiptElement.style.padding = '';
+    }).catch(error => {
+        console.error('Error generating image:', error);
+        alert('Error generating image. Please try again.');
+        receiptElement.innerHTML = originalContent;
+        receiptElement.style.backgroundColor = '';
+        receiptElement.style.padding = '';
+    });
+}
+
+function navigateRecord(direction) {
+    if (!currentRecordId) return;
+    
+    const currentIndex = allRecords.findIndex(r => r.id === currentRecordId);
+    if (currentIndex === -1) return;
+    
+    let newIndex;
+    if (direction === 'prev') {
+        newIndex = currentIndex - 1;
+        if (newIndex < 0) {
+            alert('This is the first record');
+            return;
+        }
+    } else {
+        newIndex = currentIndex + 1;
+        if (newIndex >= allRecords.length) {
+            alert('This is the last record');
+            return;
+        }
+    }
+    
+    const newRecord = allRecords[newIndex];
+    currentRecordId = newRecord.id;
+    showReceipt(newRecord.id);
+}
 
 function showImage(src, title = 'Face Image') {
     document.getElementById('modalImage').src = src;
@@ -516,9 +627,22 @@ async function showReceipt(id) {
         
         currentReceiptData = data;
         
-        const receiptHTML = generateReceiptHTML(data);
+        const currentIndex = allRecords.findIndex(r => r.id === id);
+        const totalRecords = allRecords.length;
+        
+        const receiptHTML = generateReceiptHTML(data, currentIndex + 1, totalRecords);
         content.innerHTML = receiptHTML;
         currentReceiptElement = content.querySelector('.receipt-container');
+        
+        const prevBtn = document.getElementById('prevRecordBtn');
+        const nextBtn = document.getElementById('nextRecordBtn');
+        
+        if (prevBtn) {
+            prevBtn.disabled = (currentIndex === 0);
+        }
+        if (nextBtn) {
+            nextBtn.disabled = (currentIndex === totalRecords - 1);
+        }
         
     } catch (error) {
         content.innerHTML = `
@@ -530,10 +654,13 @@ async function showReceipt(id) {
     }
 }
 
-function generateReceiptHTML(data) {
+function generateReceiptHTML(data, currentPosition, totalRecords) {
     return `
         <div class="receipt-container" style="font-family: 'Courier New', monospace; background: white; padding: 20px; border-radius: 10px; max-width: 100%;">
             <div class="text-center mb-4">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <span class="badge bg-secondary">Record ${currentPosition} of ${totalRecords}</span>
+                </div>
                 <h4 style="color: #0d6efd; margin: 0;">🏢 ATTENDANCE DETAILS</h4>
                 <div style="border-bottom: 2px dashed #0d6efd; margin: 10px 0;"></div>
                 <small style="color: #6c757d;">Record #: ${data.id} | ${data.date}</small>
@@ -584,6 +711,12 @@ function generateReceiptHTML(data) {
                 </div>
                 <div class="mt-2"><strong>Status:</strong> ${data.status}</div>
             </div>
+            
+            <div class="text-center mt-3">
+                <div style="border-top: 1px dashed #dee2e6; padding-top: 10px;">
+                    <small class="text-muted">Generated on ${new Date().toLocaleString()}</small>
+                </div>
+            </div>
         </div>
     `;
 }
@@ -622,6 +755,51 @@ document.addEventListener('keydown', (e) => {
         document.querySelector('input[name="name"]').focus();
     }
 });
+
+function shareReceipt(platform) {
+    if (!currentReceiptData) return;
+    
+    const data = currentReceiptData;
+    const shareText = `🏢 ATTENDANCE REPORT
+━━━━━━━━━━━━━━━━━━
+Employee: ${data.employee_name}
+ID: ${data.employee_id}
+MDA: ${data.mda}
+Date: ${data.date}
+━━━━━━━━━━━━━━━━━━
+Time In: ${data.time_in}
+Time Out: ${data.time_out}
+Duration: ${data.duration}
+━━━━━━━━━━━━━━━━━━
+Sign In Confidence: ${data.signin_confidence}%
+Sign Out Confidence: ${data.signout_confidence}%
+Face Quality: ${data.face_quality}
+Liveness: ${data.liveness}
+━━━━━━━━━━━━━━━━━━
+Status: ${data.status}
+Generated: ${new Date().toLocaleString()}`;
+
+    const encodedText = encodeURIComponent(shareText);
+    
+    switch(platform) {
+        case 'whatsapp':
+            window.open(`https://wa.me/?text=${encodedText}`, '_blank');
+            break;
+        case 'telegram':
+            window.open(`https://t.me/share/url?url=${encodedText}`, '_blank');
+            break;
+        case 'facebook':
+            window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodedText}`, '_blank');
+            break;
+        case 'copy':
+            navigator.clipboard.writeText(shareText).then(() => {
+                alert('Report copied to clipboard!');
+            }).catch(() => {
+                alert('Failed to copy to clipboard');
+            });
+            break;
+    }
+}
 </script>
 
 <style>

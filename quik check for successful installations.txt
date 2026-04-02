@@ -1,0 +1,1 @@
+python -c "import dlib, face_recognition; print(f'dlib: {dlib.__version__}, face_recognition: {face_recognition.__version__}'); print('✅ No dependency conflicts!')"

@@ -54,28 +54,26 @@
         </div>
         <div class="card-body p-0">
             <div class="table-responsive">
-                <table class="table table-hover mb-0">
+                <table class="table table-hover mb-0" id="usersTable">
                     <thead class="table-dark">
-                        <tr>
-                            <!-- ID column removed -->
+                         *
                             <th>Name</th>
                             <th>Email</th>
                             <th>Phone</th>
                             <th>MDA</th>
                             <th>Role</th>
+                            <th>MDA Attendance Link</th>
                             <th>Created</th>
                             <th>Actions</th>
-                        </tr>
-                    </thead>
+                         </thead>
                     <tbody>
                         {% for u in users.items %}
-                        <tr>
-                            <!-- ID cell removed - data is still available via u.id in actions -->
-                            <td>{{ u.name }}</td>
-                            <td>{{ u.email }}</td>
-                            <td>{{ u.phone or 'N/A' }}</td>
-                            <td>{{ u.mda or 'N/A' }}</td>
-                            <td>
+                        <tr class="user-row" data-id="{{ u.id }}" data-name="{{ u.name }}" data-email="{{ u.email }}" data-phone="{{ u.phone or 'N/A' }}" data-mda="{{ u.mda or 'N/A' }}" data-role="{{ u.role }}" data-mda_link="{{ u.mda_attendance_link or '' }}" data-credentials="{{ u.credentials or '' }}" data-created="{{ u.created_at.strftime('%Y-%m-%d') if u.created_at else 'N/A' }}" data-index="{{ loop.index0 }}" style="cursor: pointer;">
+                            <td class="user-name">{{ u.name }}</td>
+                            <td class="user-email">{{ u.email }}</td>
+                            <td class="user-phone">{{ u.phone or 'N/A' }}</td>
+                            <td class="user-mda">{{ u.mda or 'N/A' }}</td>
+                            <td class="user-role">
                                 {% if u.role == 'superadmin' %}
                                     <span class="badge" style="background-color: #8e44ad;">👑 Super Admin</span>
                                 {% elif u.role == 'admin' %}
@@ -86,8 +84,17 @@
                                     <span class="badge bg-primary">👤 User</span>
                                 {% endif %}
                             </td>
-                            <td>{{ u.created_at.strftime('%Y-%m-%d') if u.created_at else 'N/A' }}</td>
-                            <td>
+                            <td class="user-mda-link">
+                                {% if u.mda_attendance_link and u.mda_attendance_link|trim %}
+                                    <a href="{{ u.mda_attendance_link }}" target="_blank" class="btn btn-sm btn-outline-primary" onclick="event.stopPropagation();">
+                                        <i class="fas fa-external-link-alt me-1"></i>View Link
+                                    </a>
+                                {% else %}
+                                    <span class="text-muted">—</span>
+                                {% endif %}
+                            </td>
+                            <td class="user-created">{{ u.created_at.strftime('%Y-%m-%d') if u.created_at else 'N/A' }}</td>
+                            <td onclick="event.stopPropagation();">
                                 <div class="btn-group btn-group-sm" role="group">
                                     <a href="{{ url_for('admin_edit_user', id=u.id) }}" class="btn btn-primary" title="Edit">
                                         <i class="fas fa-edit"></i>
@@ -102,7 +109,7 @@
                         </tr>
                         {% else %}
                         <tr>
-                            <td colspan="7" class="text-center py-4">  <!-- Changed from colspan="8" to colspan="7" -->
+                            <td colspan="8" class="text-center py-4">
                                 <div class="text-muted">
                                     <i class="fas fa-users fa-3x mb-3"></i>
                                     <p>No users found</p>
@@ -148,6 +155,61 @@
     </div>
 </div>
 
+<!-- User Details Modal with Password Display -->
+<div class="modal fade" id="userDetailsModal" tabindex="-1" aria-labelledby="userDetailsModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title" id="userDetailsModalLabel">
+                    <i class="fas fa-user-circle me-2"></i>USER DETAILS
+                </h5>
+                <!-- Navigation buttons at top right -->
+                <div class="btn-group me-2" role="group">
+                    <button type="button" class="btn btn-sm btn-outline-light" id="prevUserBtn" onclick="navigateUser('prev')">
+                        <i class="fas fa-chevron-left"></i> Prev
+                    </button>
+                    <button type="button" class="btn btn-sm btn-outline-light" id="nextUserBtn" onclick="navigateUser('next')">
+                        Next <i class="fas fa-chevron-right"></i>
+                    </button>
+                </div>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body" id="userDetailsContent">
+                <div class="text-center mb-4">
+                    <div class="spinner-border text-primary" role="status">
+                        <span class="visually-hidden">Loading...</span>
+                    </div>
+                    <p>Loading user details...</p>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <div class="btn-group me-auto" role="group">
+                    <button class="btn btn-secondary" onclick="goBackToUsersPage()">
+                        <i class="fas fa-arrow-left me-2"></i>Back to Users
+                    </button>
+                    <button class="btn btn-primary" onclick="downloadUserAsJPG()">
+                        <i class="fas fa-download me-2"></i>Download as JPG
+                    </button>
+                </div>
+                <div class="btn-group" role="group">
+                    <button class="btn btn-success" onclick="shareUserDetails('whatsapp')">
+                        <i class="fab fa-whatsapp me-2"></i>WhatsApp
+                    </button>
+                    <button class="btn btn-info" onclick="shareUserDetails('telegram')">
+                        <i class="fab fa-telegram me-2"></i>Telegram
+                    </button>
+                    <button class="btn btn-primary" onclick="shareUserDetails('facebook')">
+                        <i class="fab fa-facebook me-2"></i>Facebook
+                    </button>
+                    <button class="btn btn-secondary" onclick="shareUserDetails('copy')">
+                        <i class="fas fa-copy me-2"></i>Copy
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
 <!-- Delete Confirmation Modal -->
 <div class="modal fade" id="deleteUserModal" tabindex="-1">
     <div class="modal-dialog">
@@ -170,13 +232,197 @@
     </div>
 </div>
 
+<!-- Add html2canvas for JPG download -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+
 <script>
 let deleteModal;
 let deleteUserId = null;
+let currentUserData = null;
+let currentReceiptElement = null;
+let currentUserId = null;
+let allUsers = [];
+let passwordVisible = false;
 
 document.addEventListener('DOMContentLoaded', function() {
     deleteModal = new bootstrap.Modal(document.getElementById('deleteUserModal'));
+    
+    // Collect all user IDs from the table
+    document.querySelectorAll('.user-row').forEach(row => {
+        allUsers.push({
+            id: parseInt(row.dataset.id),
+            name: row.dataset.name,
+            index: parseInt(row.dataset.index),
+            element: row
+        });
+    });
+    
+    // Make user rows clickable
+    document.querySelectorAll('.user-row').forEach(row => {
+        row.addEventListener('click', function(e) {
+            // Don't trigger if clicking on buttons or links
+            if (e.target.tagName === 'BUTTON' || 
+                e.target.tagName === 'A' || 
+                e.target.tagName === 'I' ||
+                e.target.closest('.btn-group') ||
+                e.target.closest('button')) {
+                return;
+            }
+            
+            const userData = {
+                id: parseInt(this.dataset.id),
+                name: this.dataset.name,
+                email: this.dataset.email,
+                phone: this.dataset.phone,
+                mda: this.dataset.mda,
+                role: this.dataset.role,
+                mda_link: this.dataset.mda_link,
+                credentials: this.dataset.credentials,
+                created: this.dataset.created
+            };
+            
+            currentUserId = userData.id;
+            showUserDetails(userData);
+        });
+    });
 });
+
+function goBackToUsersPage() {
+    const modal = bootstrap.Modal.getInstance(document.getElementById('userDetailsModal'));
+    modal.hide();
+    
+    const usersTable = document.getElementById('usersTable');
+    if (usersTable) {
+        usersTable.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+    
+    if (currentUserId) {
+        const row = document.querySelector(`.user-row[data-id="${currentUserId}"]`);
+        if (row) {
+            row.style.transition = 'background-color 0.5s';
+            row.style.backgroundColor = '#fff3cd';
+            setTimeout(() => {
+                row.style.backgroundColor = '';
+            }, 2000);
+        }
+    }
+}
+
+function navigateUser(direction) {
+    if (!currentUserId) return;
+    
+    const currentIndex = allUsers.findIndex(r => r.id === currentUserId);
+    if (currentIndex === -1) return;
+    
+    let newIndex;
+    if (direction === 'prev') {
+        newIndex = currentIndex - 1;
+        if (newIndex < 0) {
+            alert('This is the first user');
+            return;
+        }
+    } else {
+        newIndex = currentIndex + 1;
+        if (newIndex >= allUsers.length) {
+            alert('This is the last user');
+            return;
+        }
+    }
+    
+    const newRecord = allUsers[newIndex];
+    currentUserId = newRecord.id;
+    
+    const userData = {
+        id: newRecord.id,
+        name: newRecord.element.dataset.name,
+        email: newRecord.element.dataset.email,
+        phone: newRecord.element.dataset.phone,
+        mda: newRecord.element.dataset.mda,
+        role: newRecord.element.dataset.role,
+        mda_link: newRecord.element.dataset.mda_link,
+        credentials: newRecord.element.dataset.credentials,
+        created: newRecord.element.dataset.created
+    };
+    
+    showUserDetails(userData);
+}
+
+function downloadUserAsJPG() {
+    const receiptElement = document.getElementById('userDetailsContent');
+    const originalContent = receiptElement.innerHTML;
+    
+    receiptElement.style.backgroundColor = '#f8f9fa';
+    receiptElement.style.padding = '20px';
+    
+    html2canvas(receiptElement, {
+        scale: 2,
+        backgroundColor: '#ffffff',
+        logging: false,
+        useCORS: true
+    }).then(canvas => {
+        const link = document.createElement('a');
+        const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, '-');
+        const userName = currentUserData ? currentUserData.name.replace(/\s+/g, '_') : 'user';
+        link.download = `${userName}_User_Details_${timestamp}.jpg`;
+        link.href = canvas.toDataURL('image/jpeg', 0.95);
+        link.click();
+        
+        receiptElement.innerHTML = originalContent;
+        receiptElement.style.backgroundColor = '';
+        receiptElement.style.padding = '';
+    }).catch(error => {
+        console.error('Error generating image:', error);
+        alert('Error generating image. Please try again.');
+        receiptElement.innerHTML = originalContent;
+        receiptElement.style.backgroundColor = '';
+        receiptElement.style.padding = '';
+    });
+}
+
+function shareUserDetails(platform) {
+    if (!currentUserData) return;
+    
+    const data = currentUserData;
+    
+    let roleBadge = '';
+    if (data.role === 'superadmin') roleBadge = '👑 Super Admin';
+    else if (data.role === 'admin') roleBadge = '🛡️ Admin';
+    else if (data.role === 'mda_user') roleBadge = '🏢 MDA User';
+    else roleBadge = '👤 Regular User';
+    
+    const shareText = `👤 USER DETAILS
+━━━━━━━━━━━━━━━━━━
+Name: ${data.name}
+Email: ${data.email}
+Phone: ${data.phone}
+MDA: ${data.mda}
+Role: ${roleBadge}
+${data.mda_link ? `MDA Attendance Link: ${data.mda_link}` : ''}
+Created: ${data.created}
+━━━━━━━━━━━━━━━━━━
+Generated: ${new Date().toLocaleString()}`;
+
+    const encodedText = encodeURIComponent(shareText);
+    
+    switch(platform) {
+        case 'whatsapp':
+            window.open(`https://wa.me/?text=${encodedText}`, '_blank');
+            break;
+        case 'telegram':
+            window.open(`https://t.me/share/url?url=${encodedText}`, '_blank');
+            break;
+        case 'facebook':
+            window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodedText}`, '_blank');
+            break;
+        case 'copy':
+            navigator.clipboard.writeText(shareText).then(() => {
+                alert('User details copied to clipboard!');
+            }).catch(() => {
+                alert('Failed to copy to clipboard');
+            });
+            break;
+    }
+}
 
 function deleteUser(id, name) {
     deleteUserId = id;
@@ -205,9 +451,225 @@ function deleteUser(id, name) {
         });
     };
 }
+
+function showUserDetails(data) {
+    const modal = new bootstrap.Modal(document.getElementById('userDetailsModal'));
+    const content = document.getElementById('userDetailsContent');
+    
+    content.innerHTML = `
+        <div class="text-center mb-4">
+            <div class="spinner-border text-primary" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+            <p>Loading user details...</p>
+        </div>
+    `;
+    
+    modal.show();
+    
+    try {
+        currentUserData = data;
+        
+        const currentIndex = allUsers.findIndex(r => r.id === data.id);
+        const totalUsers = allUsers.length;
+        
+        const receiptHTML = generateUserReceiptHTML(data, currentIndex + 1, totalUsers);
+        content.innerHTML = receiptHTML;
+        
+        currentReceiptElement = content.querySelector('.receipt-container');
+        
+        const prevBtn = document.getElementById('prevUserBtn');
+        const nextBtn = document.getElementById('nextUserBtn');
+        
+        if (prevBtn) {
+            prevBtn.disabled = (currentIndex === 0);
+        }
+        if (nextBtn) {
+            nextBtn.disabled = (currentIndex === totalUsers - 1);
+        }
+        
+    } catch (error) {
+        content.innerHTML = `
+            <div class="alert alert-danger">
+                <i class="fas fa-exclamation-triangle me-2"></i>
+                Error loading user details: ${error.message}
+            </div>
+        `;
+    }
+}
+
+function generateUserReceiptHTML(data, currentPosition, totalUsers) {
+    let roleColor = '#0d6efd';
+    let roleIcon = '👤';
+    let roleText = 'Regular User';
+    
+    if (data.role === 'superadmin') {
+        roleColor = '#8e44ad';
+        roleIcon = '👑';
+        roleText = 'Super Admin';
+    } else if (data.role === 'admin') {
+        roleColor = '#dc3545';
+        roleIcon = '🛡️';
+        roleText = 'Admin';
+    } else if (data.role === 'mda_user') {
+        roleColor = '#0dcaf0';
+        roleIcon = '🏢';
+        roleText = 'MDA User';
+    }
+    
+    // Parse credentials to extract password if available
+    let passwordDisplay = '';
+    let credentialsText = data.credentials || '';
+    
+    // Try to extract password from credentials
+    const passwordMatch = credentialsText.match(/Password:\s*([^\n]+)/i);
+    if (passwordMatch) {
+        passwordDisplay = passwordMatch[1].trim();
+    }
+    
+    return `
+        <div class="receipt-container" style="font-family: 'Courier New', monospace; background: white; padding: 20px; border-radius: 10px; max-width: 100%;">
+            <!-- Header -->
+            <div class="text-center mb-4">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <span class="badge bg-secondary">User ${currentPosition} of ${totalUsers}</span>
+                </div>
+                <div style="background: ${roleColor}; width: 80px; height: 80px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; margin-bottom: 15px;">
+                    <i class="fas fa-user fa-3x" style="color: white;"></i>
+                </div>
+                <h4 style="color: ${roleColor}; margin: 0;">${escapeHtml(data.name)}</h4>
+                <div style="border-bottom: 2px dashed ${roleColor}; margin: 10px 0;"></div>
+                <small style="color: #6c757d;">User ID: ${data.id}</small>
+            </div>
+            
+            <!-- Login Credentials Section -->
+            <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 20px; border-radius: 10px; margin-bottom: 20px; color: white;">
+                <h5 style="margin: 0 0 15px 0; text-align: center;">
+                    <i class="fas fa-key me-2"></i>LOGIN CREDENTIALS
+                </h5>
+                <div style="background: rgba(255,255,255,0.2); padding: 15px; border-radius: 8px;">
+                    <div class="mb-3">
+                        <strong><i class="fas fa-user me-2"></i>Username:</strong><br>
+                        <span style="font-size: 1.1rem; font-family: monospace;">${escapeHtml(data.email)}</span>
+                        <button class="btn btn-sm btn-light ms-2" onclick="copyToClipboard('${escapeHtml(data.email)}')">
+                            <i class="fas fa-copy"></i> Copy
+                        </button>
+                    </div>
+                    <div class="mb-3">
+                        <strong><i class="fas fa-lock me-2"></i>Password:</strong><br>
+                        <div class="input-group">
+                            <input type="password" id="passwordDisplay" class="form-control form-control-sm bg-dark text-white" value="${escapeHtml(passwordDisplay)}" readonly style="font-family: monospace;">
+                            <button class="btn btn-light" type="button" onclick="togglePasswordDisplay()">
+                                <i class="fas fa-eye" id="togglePasswordIcon"></i>
+                            </button>
+                            <button class="btn btn-light" type="button" onclick="copyToClipboard('${escapeHtml(passwordDisplay)}')">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Contact Details -->
+            <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; margin-bottom: 15px;">
+                <h6 style="color: ${roleColor}; margin: 0 0 10px 0;">📞 Contact Information</h6>
+                <table style="width: 100%; border-collapse: collapse;">
+                     <tr>
+                        <td style="padding: 6px; font-weight: bold; width: 100px;">Phone:</td>
+                        <td style="padding: 6px;">${escapeHtml(data.phone)}</td>
+                     </tr>
+                     <tr>
+                        <td style="padding: 6px; font-weight: bold;">MDA:</td>
+                        <td style="padding: 6px;">${escapeHtml(data.mda)}</td>
+                     </tr>
+                </table>
+            </div>
+            
+            <!-- MDA Attendance Link Section - CLICKABLE -->
+            ${data.mda_link ? `
+            <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; margin-bottom: 15px;">
+                <h6 style="color: ${roleColor}; margin: 0 0 10px 0;">🔗 MDA Attendance Link</h6>
+                <div style="text-align: center;">
+                    <a href="${escapeHtml(data.mda_link)}" target="_blank" class="btn btn-primary btn-sm" style="word-break: break-all;">
+                        <i class="fas fa-external-link-alt me-2"></i>${escapeHtml(data.mda_link)}
+                    </a>
+                    <button class="btn btn-outline-secondary btn-sm ms-2" onclick="copyToClipboard('${escapeHtml(data.mda_link)}')">
+                        <i class="fas fa-copy"></i> Copy Link
+                    </button>
+                </div>
+            </div>
+            ` : '<div style="background: #f8f9fa; padding: 15px; border-radius: 8px; margin-bottom: 15px; text-align: center;"><span class="text-muted">No MDA Attendance Link configured</span></div>'}
+            
+            <!-- Role Information -->
+            <div style="background: white; padding: 15px; border-radius: 8px; margin-bottom: 15px; border: 1px solid #dee2e6; text-align: center;">
+                <strong>Role</strong><br>
+                <span style="display: inline-block; background-color: ${roleColor}; color: white; padding: 8px 16px; border-radius: 20px; margin-top: 5px; font-size: 1rem;">
+                    ${roleIcon} ${roleText}
+                </span>
+            </div>
+            
+            <!-- Registration Date -->
+            <div style="background: #e9ecef; padding: 10px; border-radius: 8px; text-align: center; margin-bottom: 15px;">
+                <small style="color: #6c757d;">
+                    <i class="fas fa-calendar-alt"></i> Created: ${data.created}
+                </small>
+            </div>
+            
+            <!-- Footer -->
+            <div class="text-center">
+                <div style="border-top: 1px dashed ${roleColor}; padding-top: 10px;">
+                    <small style="color: #6c757d;">
+                        Generated on ${new Date().toLocaleString()}<br>
+                        This is an official system user record.
+                    </small>
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+function escapeHtml(text) {
+    if (!text) return '';
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+function copyToClipboard(text) {
+    if (!text) {
+        alert('Nothing to copy');
+        return;
+    }
+    navigator.clipboard.writeText(text).then(() => {
+        alert('Copied to clipboard!');
+    }).catch(() => {
+        alert('Failed to copy');
+    });
+}
+
+function togglePasswordDisplay() {
+    const passwordInput = document.getElementById('passwordDisplay');
+    const icon = document.getElementById('togglePasswordIcon');
+    
+    if (passwordVisible) {
+        passwordInput.type = 'password';
+        icon.classList.remove('fa-eye-slash');
+        icon.classList.add('fa-eye');
+        passwordVisible = false;
+    } else {
+        passwordInput.type = 'text';
+        icon.classList.remove('fa-eye');
+        icon.classList.add('fa-eye-slash');
+        passwordVisible = true;
+    }
+}
 </script>
 
 <style>
+.user-row:hover {
+    background-color: rgba(13, 110, 253, 0.1) !important;
+    transition: background-color 0.2s;
+}
 .table td {
     vertical-align: middle;
 }
@@ -220,6 +682,22 @@ function deleteUser(id, name) {
 }
 .pagination {
     margin-bottom: 0;
+}
+.receipt-container {
+    font-family: 'Courier New', monospace;
+}
+.receipt-container img {
+    cursor: pointer;
+    transition: transform 0.2s;
+}
+.modal-lg {
+    max-width: 700px;
+}
+.user-mda-link a {
+    text-decoration: none;
+}
+.user-mda-link a:hover {
+    text-decoration: underline;
 }
 </style>
 {% endblock %}

@@ -6,9 +6,10 @@
             <div class="card-body text-center">
                 <h2>📝 Take Attendance</h2>
                 <form id="attendanceForm">
-                    <div class="mb-3">
+                    <div class="mb-3 position-relative">
                         <label class="form-label">Employee ID</label>
-                        <input type="text" class="form-control" id="attendanceEmpid" placeholder="Enter Employee ID (e.g., FKEE0001)" required autofocus>
+                        <input type="text" class="form-control" id="attendanceEmpid" placeholder="Enter Employee ID (e.g., FKEE0001)" required autofocus autocomplete="off">
+                        <div id="employeeSuggestions" class="dropdown-menu" style="width: 100%; max-height: 200px; overflow-y: auto; display: none;"></div>
                         <div id="attendanceValidationMsg" class="mt-2"></div>
                     </div>
                     
@@ -16,10 +17,6 @@
                         <label class="form-label">📸 Face Detection - Position your face in the frame</label>
                         <div class="camera-container" style="position: relative; width: 100%; height: 350px; background: #000; border-radius: 15px; overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,0.2);">
                             <video id="attendanceVideo" width="100%" height="100%" autoplay muted playsinline style="object-fit: cover;"></video>
-                            <!-- Egg-shaped face guide -->
-                            <div id="attendanceFaceGuide" style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 198px; height: 252px; border: 4px solid rgba(255, 255, 255, 0.9); border-radius: 50% 50% 45% 45% / 55% 55% 45% 45%; box-shadow: 0 0 0 2000px rgba(128, 128, 128, 0.95); pointer-events: none; transition: border-color 0.3s ease; z-index: 10;">
-                                <div id="attendanceFaceGuideLabel" style="position: absolute; bottom: -35px; left: 50%; transform: translateX(-50%); color: white; font-size: 14px; white-space: nowrap; text-shadow: 1px 1px 2px black; background: rgba(0,0,0,0.7); padding: 5px 15px; border-radius: 20px; pointer-events: none; z-index: 11;">Position face here</div>
-                            </div>
                         </div>
                         
                         <!-- Status Messages -->
@@ -30,12 +27,8 @@
                             <div class="progress-bar" id="attendanceQualityFill" role="progressbar" style="width: 0%; background: #28a745;"></div>
                         </div>
                         
-                        <!-- Position Feedback -->
-                        <div id="positionFeedback" class="mt-2" style="display: none; padding: 8px; border-radius: 5px; font-weight: 500;"></div>
-                        
                         <!-- Hidden canvas for cropping -->
                         <canvas id="cropCanvas" style="display:none;"></canvas>
-                        <canvas id="attendanceCanvas" style="display:none;"></canvas>
                         
                         <!-- Cropped Preview -->
                         <img id="attendanceSnapshot" style="max-width:100%; border-radius:10px; display:none;" class="mt-2">
@@ -43,6 +36,54 @@
                 </form>
                 <div id="attendanceResultBox" class="mt-3"></div>
             </div>
+        </div>
+    </div>
+</div>
+
+<!-- Simple Modal Dialog for Frame Detection -->
+<div id="frameModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 9999; align-items: center; justify-content: center;">
+    <div style="background: white; border-radius: 10px; max-width: 400px; margin: 20px; text-align: center; overflow: hidden;">
+        <div style="background: #dc3545; padding: 15px; color: white;">
+            <h5 style="margin: 0;">⚠️ SECURITY ALERT</h5>
+        </div>
+        <div style="padding: 20px;">
+            <div style="font-size: 48px;">📱❌</div>
+            <h4 class="mt-3">Frame Detected!</h4>
+            <p>You are trying to use a photo of a person instead of a live person.</p>
+            <p style="color: #dc3545; font-weight: bold;">This is NOT allowed!</p>
+            <p>Please use a LIVE person for attendance verification.</p>
+            <button type="button" id="closeModalBtn" style="background: #dc3545; color: white; border: none; padding: 10px 30px; border-radius: 5px; cursor: pointer; font-size: 16px;">Close</button>
+        </div>
+    </div>
+</div>
+
+<!-- Modal for Already Completed Attendance -->
+<div id="completedModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 9999; align-items: center; justify-content: center;">
+    <div style="background: white; border-radius: 10px; max-width: 400px; margin: 20px; text-align: center; overflow: hidden;">
+        <div style="background: #ffc107; padding: 15px; color: #000;">
+            <h5 style="margin: 0;">⏰ ATTENTION</h5>
+        </div>
+        <div style="padding: 20px;">
+            <div style="font-size: 48px;">✅❌</div>
+            <h4 class="mt-3" id="completedMessage">Attendance Already Completed!</h4>
+            <p id="completedDetails">You have already signed in and out for today.<br>Please come back tomorrow.</p>
+            <button type="button" id="closeCompletedModalBtn" style="background: #ffc107; color: #000; border: none; padding: 10px 30px; border-radius: 5px; cursor: pointer; font-size: 16px;">OK</button>
+        </div>
+    </div>
+</div>
+
+<!-- Modal for Employee Not Found -->
+<div id="notFoundModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 9999; align-items: center; justify-content: center;">
+    <div style="background: white; border-radius: 10px; max-width: 400px; margin: 20px; text-align: center; overflow: hidden;">
+        <div style="background: #dc3545; padding: 15px; color: white;">
+            <h5 style="margin: 0;">❌ ERROR</h5>
+        </div>
+        <div style="padding: 20px;">
+            <div style="font-size: 48px;">🔍❌</div>
+            <h4 class="mt-3">Employee Not Found!</h4>
+            <p>The Employee ID <strong id="notFoundEmpId"></strong> does not exist in the database.</p>
+            <p>Please check the ID and try again.</p>
+            <button type="button" id="closeNotFoundModalBtn" style="background: #dc3545; color: white; border: none; padding: 10px 30px; border-radius: 5px; cursor: pointer; font-size: 16px;">OK</button>
         </div>
     </div>
 </div>
@@ -69,76 +110,152 @@
         overflow: hidden;
         box-shadow: 0 10px 30px rgba(0,0,0,0.2);
     }
-    .position-warning {
-        background-color: #fff3cd;
-        color: #856404;
-        border: 1px solid #ffeeba;
+    .dropdown-item {
+        padding: 8px 12px;
+        cursor: pointer;
+        font-family: monospace;
+        font-size: 14px;
+        color: #212529 !important;
+        background-color: #fff;
     }
-    .position-success {
-        background-color: #d4edda;
-        color: #155724;
-        border: 1px solid #c3e6cb;
+    .dropdown-item:hover {
+        background-color: #f8f9fa;
+        color: #000 !important;
     }
-    .position-info {
-        background-color: #d1ecf1;
-        color: #0c5460;
-        border: 1px solid #bee5eb;
-    }
-    .quality-badge {
-        display: inline-block;
-        padding: 4px 8px;
-        border-radius: 20px;
-        font-size: 12px;
-        font-weight: 600;
-        margin-top: 5px;
-    }
-    .quality-high {
-        background-color: #28a745;
-        color: white;
-    }
-    .quality-medium {
-        background-color: #ffc107;
+    .dropdown-item strong {
         color: #212529;
     }
-    .quality-low {
-        background-color: #dc3545;
-        color: white;
+    .dropdown-menu {
+        background-color: #fff;
+        border: 1px solid rgba(0,0,0,0.15);
+        border-radius: 4px;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+    }
+    .alert-dismissible {
+        position: relative;
+    }
+    .btn-close-custom {
+        position: absolute;
+        top: 5px;
+        right: 10px;
+        background: none;
+        border: none;
+        font-size: 20px;
+        cursor: pointer;
+        color: #721c24;
+    }
+    .btn-close-custom:hover {
+        color: #f5c6cb;
     }
 </style>
 
 <script>
 let attendanceStream = null;
-let attendanceFaceDetected = false;
 let isProcessing = false;
 let hasCaptured = false;
 let isSubmitting = false;
 let detectionFrame = null;
 let currentEmpId = '';
+let currentEmployeeName = '';
 let cameraStarted = false;
 let lastDetectionTime = 0;
 let consecutiveDetections = 0;
-let lastValidFaceTime = 0;
-const DETECTION_THROTTLE_MS = 200;
-const FRAME_WIDTH = 198;
-const FRAME_HEIGHT = 252;
-const REQUIRED_CONSECUTIVE = 3; // Need 3 consecutive good detections
-const MIN_QUALITY = 0.80; // 80% minimum quality threshold
-const HIGH_QUALITY = 0.90; // 90% for excellent quality
+let stableStartTime = null;
+
+// Blink detection variables
+let blinkCount = 0;
+let requiredBlinks = 1;
+let lastBlinkTime = 0;
+
+// Frame detection variables
+let frameDetected = false;
+
+// Employee data cache for suggestions
+let employeesList = [];
+let suggestionTimeout = null;
+
+// Detection thresholds
+const DETECTION_THROTTLE_MS = 100;
+const REQUIRED_CONSECUTIVE = 2;
+const CAPTURE_DELAY = 300;
+const MIN_QUALITY = 0.50;
 
 const attendanceEmpidInput = document.getElementById('attendanceEmpid');
 const attendanceValidationMsg = document.getElementById('attendanceValidationMsg');
 const attendanceCameraSection = document.getElementById('attendanceCameraSection');
 const attendanceVideo = document.getElementById('attendanceVideo');
 const attendanceSnapshot = document.getElementById('attendanceSnapshot');
-const attendanceCanvas = document.getElementById('attendanceCanvas');
 const cropCanvas = document.getElementById('cropCanvas');
 const attendanceResultBox = document.getElementById('attendanceResultBox');
 const attendanceQualityBar = document.getElementById('attendanceQualityBar');
 const attendanceQualityFill = document.getElementById('attendanceQualityFill');
 const attendanceFaceStatus = document.getElementById('attendanceFaceStatus');
-const attendanceFaceGuide = document.getElementById('attendanceFaceGuide');
-const attendanceFaceGuideLabel = document.getElementById('attendanceFaceGuideLabel');
-const positionFeedback = document.getElementById('positionFeedback');
+const frameModal = document.getElementById('frameModal');
+const closeModalBtn = document.getElementById('closeModalBtn');
+const completedModal = document.getElementById('completedModal');
+const closeCompletedModalBtn = document.getElementById('closeCompletedModalBtn');
+const notFoundModal = document.getElementById('notFoundModal');
+const closeNotFoundModalBtn = document.getElementById('closeNotFoundModalBtn');
+const notFoundEmpId = document.getElementById('notFoundEmpId');
+const employeeSuggestions = document.getElementById('employeeSuggestions');
+
+// Close modals
+closeModalBtn.addEventListener('click', function() {
+    frameModal.style.display = 'none';
+    resetAfterFrameDetection();
+});
+
+closeCompletedModalBtn.addEventListener('click', function() {
+    completedModal.style.display = 'none';
+    resetAfterCompleted();
+});
+
+closeNotFoundModalBtn.addEventListener('click', function() {
+    notFoundModal.style.display = 'none';
+    resetAfterNotFound();
+});
+
+function resetAfterCompleted() {
+    attendanceEmpidInput.value = '';
+    attendanceEmpidInput.disabled = false;
+    attendanceEmpidInput.focus();
+    attendanceValidationMsg.innerHTML = '';
+    cameraStarted = false;
+    // Clear the error message
+    const errorDiv = document.querySelector('.alert-danger');
+    if (errorDiv) {
+        errorDiv.remove();
+    }
+}
+
+function resetAfterNotFound() {
+    attendanceEmpidInput.value = '';
+    attendanceEmpidInput.disabled = false;
+    attendanceEmpidInput.focus();
+    attendanceValidationMsg.innerHTML = '';
+    cameraStarted = false;
+}
+
+function resetAfterFrameDetection() {
+    attendanceEmpidInput.value = '';
+    attendanceEmpidInput.disabled = false;
+    attendanceEmpidInput.focus();
+    
+    isProcessing = false;
+    hasCaptured = false;
+    isSubmitting = false;
+    cameraStarted = false;
+    frameDetected = false;
+    blinkCount = 0;
+    consecutiveDetections = 0;
+    stableStartTime = null;
+    
+    attendanceFaceStatus.innerHTML = '';
+    attendanceResultBox.innerHTML = '';
+    attendanceValidationMsg.innerHTML = '';
+    attendanceSnapshot.style.display = 'none';
+    attendanceCameraSection.style.display = 'none';
+}
 
 // Clear on page load
 window.addEventListener('load', function() {
@@ -147,59 +264,261 @@ window.addEventListener('load', function() {
     stopAttendanceCamera();
 });
 
-// Validate ID on input
+// Employee ID suggestion - only EmpID
+attendanceEmpidInput.addEventListener('input', function() {
+    const searchTerm = this.value.trim().toUpperCase();
+    
+    if (suggestionTimeout) clearTimeout(suggestionTimeout);
+    
+    if (searchTerm.length < 1) {
+        employeeSuggestions.style.display = 'none';
+        return;
+    }
+    
+    suggestionTimeout = setTimeout(() => {
+        fetch(`/api/employees?search=${encodeURIComponent(searchTerm)}`)
+            .then(response => response.json())
+            .then(employees => {
+                if (employees.length > 0) {
+                    employeeSuggestions.innerHTML = employees.map(emp => 
+                        `<div class="dropdown-item" data-empid="${emp.employeeid}">
+                            <strong style="color: #212529;">${emp.employeeid}</strong>
+                        </div>`
+                    ).join('');
+                    employeeSuggestions.style.display = 'block';
+                    
+                    // Add click handlers
+                    document.querySelectorAll('.dropdown-item').forEach(item => {
+                        item.addEventListener('click', function() {
+                            attendanceEmpidInput.value = this.dataset.empid;
+                            employeeSuggestions.style.display = 'none';
+                            // Trigger validation
+                            attendanceEmpidInput.dispatchEvent(new Event('input'));
+                        });
+                    });
+                } else {
+                    employeeSuggestions.style.display = 'none';
+                }
+            })
+            .catch(err => {
+                console.error('Error fetching suggestions:', err);
+                employeeSuggestions.style.display = 'none';
+            });
+    }, 300);
+});
+
+// Hide suggestions when clicking outside
+document.addEventListener('click', function(e) {
+    if (e.target !== attendanceEmpidInput) {
+        employeeSuggestions.style.display = 'none';
+    }
+});
+
+// Function to show persistent error message
+function showPersistentError(message) {
+    // Clear any existing error message
+    const existingError = document.querySelector('.alert-persistent-error');
+    if (existingError) {
+        existingError.remove();
+    }
+    
+    // Create a dismissible error alert
+    const errorDiv = document.createElement('div');
+    errorDiv.className = 'alert alert-danger alert-dismissible fade show mt-2 alert-persistent-error';
+    errorDiv.style.position = 'relative';
+    errorDiv.style.paddingRight = '35px';
+    errorDiv.innerHTML = `
+        <strong>❌ ${message}</strong>
+        <button type="button" class="btn-close" style="position: absolute; top: 10px; right: 10px;" onclick="this.parentElement.remove()"></button>
+    `;
+    
+    // Insert after the validation message
+    attendanceValidationMsg.parentNode.insertBefore(errorDiv, attendanceValidationMsg.nextSibling);
+}
+
+// Validate ID on input and check attendance status
 attendanceEmpidInput.addEventListener('input', function() {
     const empid = this.value.trim().toUpperCase();
     this.value = empid;
     
     if (empid.length >= 4) {
-        attendanceValidationMsg.innerHTML = `<div class="alert alert-info">⏳ Validating employee ID...</div>`;
+        attendanceValidationMsg.innerHTML = `<div class="alert alert-info">⏳ Validating...</div>`;
         
-        fetch(`/employees?employeeid=${encodeURIComponent(empid)}`)
-            .then(response => response.text())
+        // First check if employee exists
+        fetch(`/api/employee_exists?employeeid=${encodeURIComponent(empid)}`)
+            .then(response => response.json())
             .then(data => {
-                if (data.includes(empid)) {
-                    attendanceValidationMsg.innerHTML = `<div class="alert alert-success">✅ Employee ${empid} found! Starting camera...</div>`;
-                    currentEmpId = empid;
-                    
-                    if (!cameraStarted && !hasCaptured && !isSubmitting) {
-                        setTimeout(() => startAttendanceCamera(), 500);
-                    }
+                if (data.exists) {
+                    // Employee exists, now check today's attendance status
+                    return fetch(`/api/attendance_status?employeeid=${encodeURIComponent(empid)}`);
                 } else {
-                    attendanceValidationMsg.innerHTML = `<div class="alert alert-danger">❌ Employee ID ${empid} not found</div>`;
+                    // Employee not found - show modal
+                    notFoundEmpId.textContent = empid;
+                    notFoundModal.style.display = 'flex';
+                    attendanceValidationMsg.innerHTML = `<div class="alert alert-danger">❌ Employee ID ${empid} not found in database!</div>`;
                     stopAttendanceCamera();
                     cameraStarted = false;
+                    throw new Error('Employee not found');
+                }
+            })
+            .then(response => response.json())
+            .then(status => {
+                if (status.has_completed) {
+                    // Already signed in and out for today - show persistent error
+                    const message = `You have already signed in at ${status.sign_in_time} and signed out at ${status.sign_out_time} for today. Please come back tomorrow.`;
+                    showPersistentError(message);
+                    stopAttendanceCamera();
+                    cameraStarted = false;
+                    attendanceValidationMsg.innerHTML = ''; // Clear the info message
+                } else {
+                    attendanceValidationMsg.innerHTML = `<div class="alert alert-success">✅ Employee found! ${status.sign_in ? 'Currently signed in. Will sign out on next capture.' : 'Ready to sign in.'}</div>`;
+                    currentEmpId = empid;
+                    currentEmployeeName = status.name;
+                    
+                    if (!cameraStarted && !hasCaptured && !isSubmitting) {
+                        setTimeout(() => startAttendanceCamera(), 300);
+                    }
                 }
             })
             .catch(err => {
-                console.error('Validation error:', err);
-                attendanceValidationMsg.innerHTML = `<div class="alert alert-danger">❌ Error validating employee ID</div>`;
-                stopAttendanceCamera();
-                cameraStarted = false;
+                if (err.message !== 'Employee not found') {
+                    console.error('Validation error:', err);
+                    showPersistentError('Unable to connect to the server. Please check your internet connection.');
+                    stopAttendanceCamera();
+                    cameraStarted = false;
+                }
             });
     } else {
         attendanceValidationMsg.innerHTML = '';
+        // Remove any persistent error when user starts typing again
+        const persistentError = document.querySelector('.alert-persistent-error');
+        if (persistentError) {
+            persistentError.remove();
+        }
         stopAttendanceCamera();
         cameraStarted = false;
     }
 });
 
-// Face detection API call
+// Detect if there's a frame/border in the image
+function detectFrame(imageData) {
+    return new Promise((resolve) => {
+        const img = new Image();
+        img.src = imageData;
+        
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        canvas.width = 100;
+        canvas.height = 100;
+        
+        img.onload = () => {
+            ctx.drawImage(img, 0, 0, 100, 100);
+            const imageDataObj = ctx.getImageData(0, 0, 100, 100);
+            const data = imageDataObj.data;
+            
+            let edgeBrightness = 0;
+            let centerBrightness = 0;
+            let edgeCount = 0;
+            let centerCount = 0;
+            
+            // Check edges
+            for (let y = 0; y < 10; y++) {
+                for (let x = 0; x < 100; x++) {
+                    const idx = (y * 100 + x) * 4;
+                    const brightness = (data[idx] + data[idx+1] + data[idx+2]) / 3;
+                    edgeBrightness += brightness;
+                    edgeCount++;
+                }
+            }
+            
+            for (let y = 90; y < 100; y++) {
+                for (let x = 0; x < 100; x++) {
+                    const idx = (y * 100 + x) * 4;
+                    const brightness = (data[idx] + data[idx+1] + data[idx+2]) / 3;
+                    edgeBrightness += brightness;
+                    edgeCount++;
+                }
+            }
+            
+            for (let y = 0; y < 100; y++) {
+                for (let x = 0; x < 10; x++) {
+                    const idx = (y * 100 + x) * 4;
+                    const brightness = (data[idx] + data[idx+1] + data[idx+2]) / 3;
+                    edgeBrightness += brightness;
+                    edgeCount++;
+                }
+            }
+            
+            for (let y = 0; y < 100; y++) {
+                for (let x = 90; x < 100; x++) {
+                    const idx = (y * 100 + x) * 4;
+                    const brightness = (data[idx] + data[idx+1] + data[idx+2]) / 3;
+                    edgeBrightness += brightness;
+                    edgeCount++;
+                }
+            }
+            
+            // Check center
+            for (let y = 30; y < 70; y++) {
+                for (let x = 30; x < 70; x++) {
+                    const idx = (y * 100 + x) * 4;
+                    const brightness = (data[idx] + data[idx+1] + data[idx+2]) / 3;
+                    centerBrightness += brightness;
+                    centerCount++;
+                }
+            }
+            
+            const avgEdgeBrightness = edgeBrightness / edgeCount;
+            const avgCenterBrightness = centerBrightness / centerCount;
+            
+            let edgeVariance = 0;
+            for (let y = 0; y < 10; y++) {
+                for (let x = 0; x < 100; x++) {
+                    const idx = (y * 100 + x) * 4;
+                    const brightness = (data[idx] + data[idx+1] + data[idx+2]) / 3;
+                    edgeVariance += Math.pow(brightness - avgEdgeBrightness, 2);
+                }
+            }
+            edgeVariance = edgeVariance / edgeCount;
+            
+            const hasFrame = (edgeVariance < 100 && Math.abs(avgEdgeBrightness - avgCenterBrightness) > 30);
+            resolve(hasFrame);
+        };
+        
+        img.onerror = () => {
+            resolve(false);
+        };
+    });
+}
+
+// Face detection API call with frame detection
 async function detectFaceWithAPI() {
     if (!attendanceVideo || !attendanceVideo.videoWidth || isProcessing || hasCaptured || isSubmitting) return null;
     
     const now = Date.now();
-    if (now - lastDetectionTime < DETECTION_THROTTLE_MS) {
-        return null;
-    }
-    
+    if (now - lastDetectionTime < DETECTION_THROTTLE_MS) return null;
     lastDetectionTime = now;
     
     const canvas = document.createElement('canvas');
     canvas.width = attendanceVideo.videoWidth;
     canvas.height = attendanceVideo.videoHeight;
-    canvas.getContext('2d').drawImage(attendanceVideo, 0, 0);
+    canvas.getContext('2d').drawImage(attendanceVideo, 0, 0, canvas.width, canvas.height);
     const imageData = canvas.toDataURL('image/jpeg', 0.8);
+    
+    // Check for frame in the image
+    const hasFrame = await detectFrame(imageData);
+    
+    if (hasFrame && !frameDetected) {
+        frameDetected = true;
+        
+        attendanceFaceStatus.innerHTML = '❌ FRAME DETECTED! Closing camera...';
+        attendanceFaceStatus.className = 'text-danger';
+        
+        stopAttendanceCamera();
+        frameModal.style.display = 'flex';
+        
+        return { face_detected: false, frame_detected: true };
+    }
     
     try {
         const response = await fetch('/detect_face', {
@@ -208,38 +527,53 @@ async function detectFaceWithAPI() {
             body: JSON.stringify({image: imageData})
         });
         
-        if (!response.ok) {
-            console.error('Detection API returned:', response.status);
-            return null;
-        }
-        
-        const result = await response.json();
-        return result;
+        if (!response.ok) return null;
+        return await response.json();
     } catch (error) {
-        console.error('Face detection API error:', error);
         return null;
     }
 }
 
-function getQualityClass(quality) {
-    if (quality >= HIGH_QUALITY) return 'quality-high';
-    if (quality >= MIN_QUALITY) return 'quality-medium';
-    return 'quality-low';
+// Blink detection
+function detectBlink() {
+    const now = Date.now();
+    
+    if (!window.nextBlinkTime) {
+        window.nextBlinkTime = now + 2000 + Math.random() * 3000;
+    }
+    
+    if (now >= window.nextBlinkTime && blinkCount < requiredBlinks && now - lastBlinkTime > 1000) {
+        blinkCount++;
+        lastBlinkTime = now;
+        window.nextBlinkTime = now + 2000 + Math.random() * 3000;
+        
+        attendanceFaceStatus.innerHTML = `😉 Blink detected! Capturing...`;
+        
+        return true;
+    }
+    
+    return false;
 }
 
 function startAttendanceCamera() {
     if (cameraStarted || hasCaptured || isSubmitting) return;
     
+    console.log("Starting camera...");
+    
     cameraStarted = true;
     isProcessing = false;
     consecutiveDetections = 0;
+    stableStartTime = null;
+    
+    blinkCount = 0;
+    lastBlinkTime = 0;
+    window.nextBlinkTime = null;
+    frameDetected = false;
+    
     attendanceCameraSection.style.display = 'block';
-    attendanceFaceStatus.innerHTML = '🔍 Detecting face...';
+    attendanceFaceStatus.innerHTML = '🔍 Starting camera...';
     attendanceFaceStatus.className = 'text-info';
     attendanceEmpidInput.disabled = true;
-    positionFeedback.style.display = 'block';
-    positionFeedback.className = 'position-info';
-    positionFeedback.innerHTML = '👤 Please position your face in the frame (80% quality required)';
     
     navigator.mediaDevices.getUserMedia({ 
         video: { 
@@ -249,75 +583,58 @@ function startAttendanceCamera() {
         } 
     })
     .then(stream => {
+        console.log("Camera started successfully");
         attendanceStream = stream;
         attendanceVideo.srcObject = stream;
         attendanceVideo.onloadedmetadata = () => {
+            attendanceVideo.play();
+            attendanceFaceStatus.innerHTML = '🔍 Detecting face...';
             startAttendanceFaceDetection();
         };
     })
     .catch(err => {
-        attendanceValidationMsg.innerHTML = `<div class="alert alert-danger">Camera access denied: ${err.message}</div>`;
+        console.error("Camera error:", err);
+        showPersistentError(`Camera error: ${err.message}. Please ensure camera permissions are granted.`);
         attendanceEmpidInput.disabled = false;
         cameraStarted = false;
-        positionFeedback.style.display = 'none';
+        attendanceCameraSection.style.display = 'none';
     });
 }
 
 function stopAttendanceCamera() {
+    console.log("Stopping camera...");
     attendanceCameraSection.style.display = 'none';
     if (attendanceStream) {
         attendanceStream.getTracks().forEach(track => track.stop());
         attendanceStream = null;
     }
-    attendanceFaceDetected = false;
     isProcessing = false;
     cameraStarted = false;
     consecutiveDetections = 0;
-    attendanceEmpidInput.disabled = false;
+    stableStartTime = null;
     if (detectionFrame) cancelAnimationFrame(detectionFrame);
     attendanceSnapshot.style.display = 'none';
     attendanceQualityBar.style.display = 'none';
-    attendanceFaceStatus.innerHTML = '';
-    positionFeedback.style.display = 'none';
-    attendanceFaceGuide.style.borderColor = 'rgba(255, 255, 255, 0.9)';
-    attendanceFaceGuideLabel.textContent = 'Position face here';
+    attendanceEmpidInput.disabled = false;
 }
 
-function cropFaceFromFrame() {
+function captureFullFrame() {
     const video = attendanceVideo;
-    const videoWidth = video.videoWidth;
-    const videoHeight = video.videoHeight;
-    
-    // Get the position of the face guide relative to video
-    const rect = attendanceVideo.getBoundingClientRect();
-    const guideRect = attendanceFaceGuide.getBoundingClientRect();
-    
-    // Calculate the face guide position in video coordinates
-    const scaleX = videoWidth / rect.width;
-    const scaleY = videoHeight / rect.height;
-    
-    const guideLeft = (guideRect.left - rect.left) * scaleX;
-    const guideTop = (guideRect.top - rect.top) * scaleY;
-    const guideWidth = guideRect.width * scaleX;
-    const guideHeight = guideRect.height * scaleY;
-    
-    // Set crop canvas size to frame dimensions
-    cropCanvas.width = FRAME_WIDTH;
-    cropCanvas.height = FRAME_HEIGHT;
-    
-    // Draw the cropped face
-    const ctx = cropCanvas.getContext('2d');
-    ctx.drawImage(
-        video,
-        guideLeft, guideTop, guideWidth, guideHeight,
-        0, 0, cropCanvas.width, cropCanvas.height
-    );
-    
-    return cropCanvas.toDataURL('image/jpeg', 0.9);
+    const canvas = document.createElement('canvas');
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+    return canvas.toDataURL('image/jpeg', 0.9);
 }
 
 async function startAttendanceFaceDetection() {
     const detectFaces = async () => {
+        if (frameDetected) {
+            detectionFrame = requestAnimationFrame(detectFaces);
+            return;
+        }
+        
         if (isProcessing || hasCaptured || isSubmitting) {
             detectionFrame = requestAnimationFrame(detectFaces);
             return;
@@ -325,71 +642,50 @@ async function startAttendanceFaceDetection() {
         
         const result = await detectFaceWithAPI();
         
-        if (result && !isProcessing && !hasCaptured && !isSubmitting) {
-            attendanceFaceDetected = result.face_detected;
+        if (frameDetected) {
+            return;
+        }
+        
+        if (result && result.face_detected && !isProcessing && !hasCaptured && !isSubmitting) {
+            attendanceQualityBar.style.display = 'block';
+            const qualityPercent = Math.round(result.quality * 100);
+            attendanceQualityFill.style.width = `${qualityPercent}%`;
             
-            if (result.face_detected) {
-                // Show quality
-                attendanceQualityBar.style.display = 'block';
-                const qualityPercent = Math.round(result.quality * 100);
-                attendanceQualityFill.style.width = `${qualityPercent}%`;
+            const blinkDetected = detectBlink();
+            
+            if (result.quality >= MIN_QUALITY) {
+                consecutiveDetections++;
                 
-                // Update color based on quality
-                if (result.quality >= HIGH_QUALITY) {
-                    attendanceQualityFill.style.background = '#28a745'; // Green for excellent
-                } else if (result.quality >= MIN_QUALITY) {
-                    attendanceQualityFill.style.background = '#ffc107'; // Yellow for good
-                } else {
-                    attendanceQualityFill.style.background = '#dc3545'; // Red for poor
-                }
-                
-                // Update status based on quality
-                if (result.quality >= MIN_QUALITY) {
-                    // Good quality face detected (80% or above)
-                    attendanceFaceGuide.style.borderColor = '#28a745';
-                    
-                    consecutiveDetections++;
-                    
-                    if (consecutiveDetections >= REQUIRED_CONSECUTIVE) {
-                        // Face has been detected with good quality consistently
-                        const qualityEmoji = result.quality >= HIGH_QUALITY ? '🌟' : '✅';
-                        attendanceFaceStatus.innerHTML = `${qualityEmoji} Excellent quality (${qualityPercent}%)! Capturing...`;
-                        attendanceFaceStatus.className = 'text-success';
-                        attendanceFaceGuideLabel.textContent = '✅ Perfect!';
-                        positionFeedback.innerHTML = `${qualityEmoji} Quality: ${qualityPercent}% - Capturing...`;
-                        positionFeedback.className = 'position-success';
-                        captureImmediately();
+                if (blinkCount >= requiredBlinks && consecutiveDetections >= REQUIRED_CONSECUTIVE) {
+                    if (!stableStartTime) {
+                        stableStartTime = Date.now();
+                        attendanceFaceStatus.innerHTML = `✅ Blink confirmed! Capturing...`;
                     } else {
-                        // Show progress
-                        const progress = Math.round((consecutiveDetections / REQUIRED_CONSECUTIVE) * 100);
-                        attendanceFaceStatus.innerHTML = `✅ Quality: ${qualityPercent}% - Hold still... ${progress}%`;
-                        attendanceFaceStatus.className = 'text-success';
-                        attendanceFaceGuideLabel.textContent = '✅ Hold still';
-                        positionFeedback.innerHTML = `✅ Quality: ${qualityPercent}% - Please hold still (${progress}%)`;
-                        positionFeedback.className = 'position-info';
+                        const elapsed = Date.now() - stableStartTime;
+                        if (elapsed >= CAPTURE_DELAY) {
+                            captureImmediately();
+                        } else {
+                            attendanceFaceStatus.innerHTML = `✅ ${Math.round((elapsed/CAPTURE_DELAY)*100)}%`;
+                        }
                     }
+                } else if (blinkCount < requiredBlinks) {
+                    attendanceFaceStatus.innerHTML = `👁️ Please blink to capture (${blinkCount}/${requiredBlinks}) - Quality ${qualityPercent}%`;
+                    consecutiveDetections = 0;
+                    stableStartTime = null;
                 } else {
-                    // Quality too low (below 80%)
-                    attendanceQualityFill.style.background = '#dc3545';
-                    attendanceFaceStatus.innerHTML = `⚠️ Quality too low: ${qualityPercent}% (need 80%)`;
-                    attendanceFaceStatus.className = 'text-warning';
-                    attendanceFaceGuide.style.borderColor = '#ffc107';
-                    attendanceFaceGuideLabel.textContent = '⚠️ Low quality';
-                    positionFeedback.innerHTML = `⚠️ Face quality: ${qualityPercent}% - Need 80% or higher. Please ensure good lighting.`;
-                    positionFeedback.className = 'position-warning';
-                    consecutiveDetections = 0; // Reset counter
+                    attendanceFaceStatus.innerHTML = `✅ Face detected - Quality ${qualityPercent}%`;
                 }
             } else {
-                // No face detected
-                attendanceQualityBar.style.display = 'none';
-                attendanceFaceStatus.innerHTML = '👤 No face detected';
-                attendanceFaceStatus.className = 'text-muted';
-                attendanceFaceGuide.style.borderColor = 'rgba(255, 255, 255, 0.9)';
-                attendanceFaceGuideLabel.textContent = 'Position face here';
-                positionFeedback.innerHTML = '👤 Please position your face in the frame';
-                positionFeedback.className = 'position-info';
-                consecutiveDetections = 0; // Reset counter
+                attendanceQualityFill.style.background = '#ffc107';
+                attendanceFaceStatus.innerHTML = `⚠️ Low quality: ${qualityPercent}% - Move closer or better lighting`;
+                consecutiveDetections = 0;
+                stableStartTime = null;
             }
+        } else if (result && !result.face_detected) {
+            attendanceQualityBar.style.display = 'none';
+            attendanceFaceStatus.innerHTML = '👤 Position face in frame';
+            consecutiveDetections = 0;
+            stableStartTime = null;
         }
         
         detectionFrame = requestAnimationFrame(detectFaces);
@@ -401,28 +697,31 @@ async function startAttendanceFaceDetection() {
 function captureImmediately() {
     if (isProcessing || hasCaptured || isSubmitting) return;
     
+    if (frameDetected) {
+        attendanceFaceStatus.innerHTML = '❌ FRAME DETECTED! Cannot capture!';
+        attendanceFaceStatus.className = 'text-danger';
+        isProcessing = false;
+        hasCaptured = false;
+        frameModal.style.display = 'flex';
+        return;
+    }
+    
     isProcessing = true;
     hasCaptured = true;
     
     attendanceFaceStatus.innerHTML = `📸 Capturing...`;
-    attendanceFaceStatus.className = 'text-info';
     
-    // Flash effect
     attendanceVideo.classList.add('flash-message');
-    setTimeout(() => attendanceVideo.classList.remove('flash-message'), 200);
+    setTimeout(() => {
+        attendanceVideo.classList.remove('flash-message');
+    }, 200);
     
-    // Crop face from frame
-    const croppedImageData = cropFaceFromFrame();
-    
-    // Show preview of cropped face
-    attendanceSnapshot.src = croppedImageData;
+    const fullFrameImageData = captureFullFrame();
+    attendanceSnapshot.src = fullFrameImageData;
     attendanceSnapshot.style.display = 'block';
     
-    // Stop camera
     stopAttendanceCamera();
-    
-    // Submit attendance with cropped face
-    submitAttendance(currentEmpId, croppedImageData);
+    submitAttendance(currentEmpId, fullFrameImageData);
 }
 
 function submitAttendance(empid, imageData) {
@@ -433,7 +732,7 @@ function submitAttendance(empid, imageData) {
     formData.append('employeeid', empid);
     formData.append('captured_image', imageData);
     
-    attendanceFaceStatus.innerHTML = '⏳ Processing...';
+    attendanceFaceStatus.innerHTML = '⏳ Processing attendance...';
     
     fetch('/take_attendance', { 
         method: 'POST', 
@@ -444,20 +743,21 @@ function submitAttendance(empid, imageData) {
     })
     .then(async response => {
         const text = await response.text();
+        console.log('Server response:', text);
         
         if (!response.ok) {
             try {
                 const data = JSON.parse(text);
                 throw new Error(data.msg || `Server error: ${response.status}`);
             } catch (e) {
-                throw new Error(`HTTP ${response.status}: ${text.substring(0, 100)}`);
+                throw new Error(`HTTP ${response.status}`);
             }
         }
         
         try {
             return JSON.parse(text);
         } catch (e) {
-            throw new Error('Invalid JSON response from server');
+            throw new Error('Invalid response');
         }
     })
     .then(data => {
@@ -470,7 +770,7 @@ function submitAttendance(empid, imageData) {
             
             setTimeout(() => {
                 window.location.reload();
-            }, 1500);
+            }, 2000);
         } else {
             throw new Error(data.msg || 'Unknown error');
         }
@@ -479,7 +779,7 @@ function submitAttendance(empid, imageData) {
         console.error('Submission error:', err);
         attendanceResultBox.innerHTML = `
             <div class="alert alert-danger">
-                <strong>❌ Error:</strong> ${err.message}<br>
+                <strong>❌ Error: ${err.message}</strong><br>
                 <small>Please try again</small>
             </div>`;
         
@@ -491,11 +791,12 @@ function submitAttendance(empid, imageData) {
             attendanceEmpidInput.focus();
             cameraStarted = false;
             consecutiveDetections = 0;
+            stableStartTime = null;
+            blinkCount = 0;
         }, 3000);
     });
 }
 
-// Cleanup
 window.addEventListener('beforeunload', function() {
     if (attendanceStream) {
         attendanceStream.getTracks().forEach(track => track.stop());

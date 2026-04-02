@@ -135,6 +135,7 @@
                              data-regimage="{{ emp.Employee.registered_image if emp.Employee else '' }}"
                              data-signinmatch="{{ emp.reg_signin_match }}"
                              data-signinconfidence="{{ emp.signin_confidence }}"
+                             data-index="{{ loop.index0 }}"
                              style="cursor: pointer; transition: all 0.2s;">
                             
                             <div class="col-md-2 text-center">
@@ -228,7 +229,7 @@
     </div>
 </div>
 
-<!-- Office Receipt Modal -->
+<!-- Office Receipt Modal with Navigation -->
 <div class="modal fade" id="officeReceiptModal" tabindex="-1" aria-labelledby="officeReceiptModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-lg">
         <div class="modal-content">
@@ -236,6 +237,15 @@
                 <h5 class="modal-title" id="officeReceiptModalLabel">
                     <i class="fas fa-building me-2"></i>CURRENT ATTENDANCE DETAILS
                 </h5>
+                <!-- Navigation buttons at top right -->
+                <div class="btn-group me-2" role="group">
+                    <button type="button" class="btn btn-sm btn-outline-light" id="prevOfficeBtn" onclick="navigateOffice('prev')">
+                        <i class="fas fa-chevron-left"></i> Prev
+                    </button>
+                    <button type="button" class="btn btn-sm btn-outline-light" id="nextOfficeBtn" onclick="navigateOffice('next')">
+                        Next <i class="fas fa-chevron-right"></i>
+                    </button>
+                </div>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body" id="officeReceiptContent">
@@ -247,21 +257,28 @@
                 </div>
             </div>
             <div class="modal-footer">
-                <div class="btn-group w-100" role="group">
-                    <button class="btn btn-success" onclick="downloadOfficePDF()">
-                        <i class="fas fa-file-pdf me-2"></i>Download PDF
+                <div class="btn-group me-auto" role="group">
+                    <button class="btn btn-secondary" onclick="goBackToOfficePage()">
+                        <i class="fas fa-arrow-left me-2"></i>Back to Office
                     </button>
-                    <button class="btn btn-info" onclick="shareOfficePDF('whatsapp')">
-                        <i class="fab fa-whatsapp me-2"></i>WhatsApp
-                    </button>
-                    <button class="btn btn-primary" onclick="shareOfficePDF('telegram')">
-                        <i class="fab fa-telegram me-2"></i>Telegram
-                    </button>
-                    <button class="btn btn-secondary" onclick="shareOfficePDF('email')">
-                        <i class="fas fa-envelope me-2"></i>Email
+                    <button class="btn btn-primary" onclick="downloadOfficeAsJPG()">
+                        <i class="fas fa-download me-2"></i>Download as JPG
                     </button>
                 </div>
-                <button type="button" class="btn btn-secondary w-100 mt-2" data-bs-dismiss="modal">Close</button>
+                <div class="btn-group" role="group">
+                    <button class="btn btn-success" onclick="shareOfficeReport('whatsapp')">
+                        <i class="fab fa-whatsapp me-2"></i>WhatsApp
+                    </button>
+                    <button class="btn btn-info" onclick="shareOfficeReport('telegram')">
+                        <i class="fab fa-telegram me-2"></i>Telegram
+                    </button>
+                    <button class="btn btn-primary" onclick="shareOfficeReport('facebook')">
+                        <i class="fab fa-facebook me-2"></i>Facebook
+                    </button>
+                    <button class="btn btn-secondary" onclick="shareOfficeReport('copy')">
+                        <i class="fas fa-copy me-2"></i>Copy
+                    </button>
+                </div>
             </div>
         </div>
     </div>
@@ -304,19 +321,30 @@
     </div>
 </div>
 
-<!-- Add Font Awesome if not already in layout -->
+<!-- Add Font Awesome and html2canvas -->
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
-<!-- html2pdf library -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 
 <script>
 let imageModal;
 let currentOfficeData = null;
 let currentReceiptElement = null;
+let currentOfficeId = null;
+let allOfficeEmployees = [];
 const MATCH_THRESHOLD = 55; // 55% threshold
 
 document.addEventListener('DOMContentLoaded', function() {
     imageModal = new bootstrap.Modal(document.getElementById('imageModal'));
+    
+    // Collect all office employee IDs from the list
+    document.querySelectorAll('.office-row').forEach(row => {
+        allOfficeEmployees.push({
+            id: parseInt(row.dataset.id),
+            name: row.dataset.name,
+            index: parseInt(row.dataset.index),
+            element: row
+        });
+    });
     
     // Make office rows clickable
     document.querySelectorAll('.office-row').forEach(row => {
@@ -332,7 +360,7 @@ document.addEventListener('DOMContentLoaded', function() {
             
             // Get data from data attributes
             const data = {
-                id: this.dataset.id,
+                id: parseInt(this.dataset.id),
                 employee_name: this.dataset.name,
                 employee_id: this.dataset.employeeid,
                 mda: this.dataset.mda,
@@ -343,6 +371,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 signin_confidence: this.dataset.signinconfidence ? (parseFloat(this.dataset.signinconfidence) * 100).toFixed(1) : '0'
             };
             
+            currentOfficeId = data.id;
             showOfficeReceipt(data);
         });
     });
@@ -391,6 +420,148 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 });
 
+function goBackToOfficePage() {
+    const modal = bootstrap.Modal.getInstance(document.getElementById('officeReceiptModal'));
+    modal.hide();
+    
+    const officeContainer = document.querySelector('.card.shadow');
+    if (officeContainer) {
+        officeContainer.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+    
+    if (currentOfficeId) {
+        const row = document.querySelector(`.office-row[data-id="${currentOfficeId}"]`);
+        if (row) {
+            row.style.transition = 'background-color 0.5s';
+            row.style.backgroundColor = '#fff3cd';
+            setTimeout(() => {
+                row.style.backgroundColor = '';
+            }, 2000);
+        }
+    }
+}
+
+function navigateOffice(direction) {
+    if (!currentOfficeId) return;
+    
+    const currentIndex = allOfficeEmployees.findIndex(r => r.id === currentOfficeId);
+    if (currentIndex === -1) return;
+    
+    let newIndex;
+    if (direction === 'prev') {
+        newIndex = currentIndex - 1;
+        if (newIndex < 0) {
+            alert('This is the first employee in office');
+            return;
+        }
+    } else {
+        newIndex = currentIndex + 1;
+        if (newIndex >= allOfficeEmployees.length) {
+            alert('This is the last employee in office');
+            return;
+        }
+    }
+    
+    const newRecord = allOfficeEmployees[newIndex];
+    currentOfficeId = newRecord.id;
+    
+    // Get data from the row
+    const row = newRecord.element;
+    const data = {
+        id: parseInt(row.dataset.id),
+        employee_name: row.dataset.name,
+        employee_id: row.dataset.employeeid,
+        mda: row.dataset.mda,
+        time_in: row.dataset.timein,
+        signin_image: row.dataset.signinimage,
+        reg_image: row.dataset.regimage,
+        signin_match: row.dataset.signinmatch === 'True',
+        signin_confidence: row.dataset.signinconfidence ? (parseFloat(row.dataset.signinconfidence) * 100).toFixed(1) : '0'
+    };
+    
+    showOfficeReceipt(data);
+}
+
+function downloadOfficeAsJPG() {
+    const receiptElement = document.getElementById('officeReceiptContent');
+    const originalContent = receiptElement.innerHTML;
+    
+    // Add a wrapper for better screenshot quality
+    receiptElement.style.backgroundColor = '#f8f9fa';
+    receiptElement.style.padding = '20px';
+    
+    html2canvas(receiptElement, {
+        scale: 2,
+        backgroundColor: '#ffffff',
+        logging: false,
+        useCORS: true
+    }).then(canvas => {
+        // Create download link
+        const link = document.createElement('a');
+        const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, '-');
+        const employeeName = currentOfficeData ? currentOfficeData.employee_name.replace(/\s+/g, '_') : 'attendance';
+        link.download = `${employeeName}_Current_Attendance_${timestamp}.jpg`;
+        link.href = canvas.toDataURL('image/jpeg', 0.95);
+        link.click();
+        
+        // Restore original content
+        receiptElement.innerHTML = originalContent;
+        receiptElement.style.backgroundColor = '';
+        receiptElement.style.padding = '';
+    }).catch(error => {
+        console.error('Error generating image:', error);
+        alert('Error generating image. Please try again.');
+        receiptElement.innerHTML = originalContent;
+        receiptElement.style.backgroundColor = '';
+        receiptElement.style.padding = '';
+    });
+}
+
+function shareOfficeReport(platform) {
+    if (!currentOfficeData) return;
+    
+    const data = currentOfficeData;
+    const signinMatch = parseFloat(data.signin_confidence) >= MATCH_THRESHOLD;
+    const currentTime = new Date().toLocaleTimeString();
+    
+    const shareText = `🏢 CURRENT ATTENDANCE STATUS
+━━━━━━━━━━━━━━━━━━
+Employee: ${data.employee_name}
+ID: ${data.employee_id || 'N/A'}
+MDA: ${data.mda || 'N/A'}
+━━━━━━━━━━━━━━━━━━
+⏰ Sign In Time: ${data.time_in}
+Current Time: ${currentTime}
+Status: Currently In Office
+━━━━━━━━━━━━━━━━━━
+🔍 Face Recognition:
+Sign In Confidence: ${data.signin_confidence}%
+Match: ${signinMatch ? '✅' : '❌'} (Threshold: ${MATCH_THRESHOLD}%)
+━━━━━━━━━━━━━━━━━━
+Generated: ${new Date().toLocaleString()}`;
+
+    const encodedText = encodeURIComponent(shareText);
+    
+    switch(platform) {
+        case 'whatsapp':
+            window.open(`https://wa.me/?text=${encodedText}`, '_blank');
+            break;
+        case 'telegram':
+            window.open(`https://t.me/share/url?url=${encodedText}`, '_blank');
+            break;
+        case 'facebook':
+            window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodedText}`, '_blank');
+            break;
+        case 'copy':
+            navigator.clipboard.writeText(shareText).then(() => {
+                alert('Attendance report copied to clipboard!');
+            }).catch(() => {
+                alert('Failed to copy to clipboard');
+            });
+            break;
+    }
+}
+
 function showImage(src) {
     document.getElementById('modalImage').src = src;
     imageModal.show();
@@ -415,12 +586,26 @@ function showOfficeReceipt(data) {
     try {
         currentOfficeData = data;
         
+        const currentIndex = allOfficeEmployees.findIndex(r => r.id === data.id);
+        const totalEmployees = allOfficeEmployees.length;
+        
         // Generate receipt HTML
-        const receiptHTML = generateOfficeReceiptHTML(data);
+        const receiptHTML = generateOfficeReceiptHTML(data, currentIndex + 1, totalEmployees);
         content.innerHTML = receiptHTML;
         
-        // Store reference to receipt element for PDF generation
+        // Store reference to receipt element
         currentReceiptElement = content.querySelector('.receipt-container');
+        
+        // Update navigation button states
+        const prevBtn = document.getElementById('prevOfficeBtn');
+        const nextBtn = document.getElementById('nextOfficeBtn');
+        
+        if (prevBtn) {
+            prevBtn.disabled = (currentIndex === 0);
+        }
+        if (nextBtn) {
+            nextBtn.disabled = (currentIndex === totalEmployees - 1);
+        }
         
     } catch (error) {
         content.innerHTML = `
@@ -432,7 +617,7 @@ function showOfficeReceipt(data) {
     }
 }
 
-function generateOfficeReceiptHTML(data) {
+function generateOfficeReceiptHTML(data, currentPosition, totalEmployees) {
     const signinMatch = parseFloat(data.signin_confidence) >= MATCH_THRESHOLD;
     const currentTime = new Date().toLocaleTimeString();
     
@@ -440,30 +625,33 @@ function generateOfficeReceiptHTML(data) {
         <div class="receipt-container" style="font-family: 'Courier New', monospace; background: white; padding: 20px; border-radius: 10px; max-width: 100%;">
             <!-- Header -->
             <div class="text-center mb-4">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <span class="badge bg-secondary">Employee ${currentPosition} of ${totalEmployees}</span>
+                    <span style="display: inline-block; background: #17a2b8; color: white; padding: 3px 8px; border-radius: 20px; font-size: 12px;">Currently In Office</span>
+                </div>
                 <h4 style="color: #0d6efd; margin: 0;">🏢 CURRENT ATTENDANCE STATUS</h4>
                 <div style="border-bottom: 2px dashed #0d6efd; margin: 10px 0;"></div>
                 <small style="color: #6c757d;">Record ID: ${data.id} | ${new Date().toLocaleDateString()}</small>
                 <div class="mt-2">
-                    <span style="display: inline-block; background: #17a2b8; color: white; padding: 3px 8px; border-radius: 20px; font-size: 12px;">Currently In Office</span>
-                    <span style="display: inline-block; background: #6c757d; color: white; padding: 3px 8px; border-radius: 20px; font-size: 12px; margin-left: 5px;">Threshold: ${MATCH_THRESHOLD}%</span>
+                    <span style="display: inline-block; background: #6c757d; color: white; padding: 3px 8px; border-radius: 20px; font-size: 12px;">Threshold: ${MATCH_THRESHOLD}%</span>
                 </div>
             </div>
             
             <!-- Employee Details -->
             <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; margin-bottom: 15px;">
                 <table style="width: 100%; border-collapse: collapse;">
-                    <tr>
+                     <tr>
                         <td style="padding: 6px; font-weight: bold; width: 100px;">Employee:</td>
                         <td style="padding: 6px;">${data.employee_name}</td>
-                    </tr>
-                    <tr>
+                     </tr>
+                     <tr>
                         <td style="padding: 6px; font-weight: bold;">ID:</td>
                         <td style="padding: 6px;">${data.employee_id || 'N/A'}</td>
-                    </tr>
-                    <tr>
+                     </tr>
+                     <tr>
                         <td style="padding: 6px; font-weight: bold;">MDA:</td>
                         <td style="padding: 6px;">${data.mda || 'N/A'}</td>
-                    </tr>
+                     </tr>
                 </table>
             </div>
             
@@ -520,93 +708,6 @@ function generateOfficeReceiptHTML(data) {
             </div>
         </div>
     `;
-}
-
-function downloadOfficePDF() {
-    if (!currentReceiptElement) {
-        alert('No report to download');
-        return;
-    }
-    
-    const employeeName = currentOfficeData ? currentOfficeData.employee_name : 'attendance';
-    const filename = `${employeeName}_Current_Attendance.pdf`.replace(/\s+/g, '_');
-    
-    const opt = {
-        margin: [0.5, 0.5, 0.5, 0.5],
-        filename: filename,
-        image: { type: 'jpeg', quality: 0.98 },
-        html2canvas: { scale: 2, logging: false, letterRendering: true },
-        jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' }
-    };
-    
-    html2pdf().set(opt).from(currentReceiptElement).save();
-}
-
-function shareOfficePDF(platform) {
-    if (!currentReceiptElement) {
-        alert('No report to share');
-        return;
-    }
-    
-    const employeeName = currentOfficeData ? currentOfficeData.employee_name : 'attendance';
-    const filename = `${employeeName}_Current_Attendance.pdf`.replace(/\s+/g, '_');
-    
-    // Generate PDF as blob
-    const opt = {
-        margin: [0.5, 0.5, 0.5, 0.5],
-        filename: filename,
-        image: { type: 'jpeg', quality: 0.98 },
-        html2canvas: { scale: 2, logging: false, letterRendering: true },
-        jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' }
-    };
-    
-    html2pdf().set(opt).from(currentReceiptElement).outputPdf().then((pdfBlob) => {
-        const signinMatch = parseFloat(currentOfficeData.signin_confidence) >= MATCH_THRESHOLD;
-        
-        if (platform === 'whatsapp') {
-            const shareText = `🏢 CURRENT ATTENDANCE STATUS
-━━━━━━━━━━━━━━━━━━
-Employee: ${employeeName}
-ID: ${currentOfficeData.employee_id || 'N/A'}
-MDA: ${currentOfficeData.mda || 'N/A'}
-━━━━━━━━━━━━━━━━━━
-⏰ Sign In Time: ${currentOfficeData.time_in}
-Status: Currently In Office
-━━━━━━━━━━━━━━━━━━
-🔍 Face Recognition:
-Sign In Confidence: ${currentOfficeData.signin_confidence}%
-Match: ${signinMatch ? '✅' : '❌'} (Threshold: ${MATCH_THRESHOLD}%)
-━━━━━━━━━━━━━━━━━━`;
-            window.open(`https://wa.me/?text=${encodeURIComponent(shareText)}`, '_blank');
-            alert('PDF generated. Please download and share via WhatsApp manually.');
-            downloadOfficePDF();
-            
-        } else if (platform === 'telegram') {
-            const shareText = `🏢 CURRENT ATTENDANCE STATUS
-━━━━━━━━━━━━━━━━━━
-Employee: ${employeeName}
-ID: ${currentOfficeData.employee_id || 'N/A'}
-MDA: ${currentOfficeData.mda || 'N/A'}
-━━━━━━━━━━━━━━━━━━
-⏰ Sign In Time: ${currentOfficeData.time_in}
-Status: Currently In Office
-━━━━━━━━━━━━━━━━━━
-🔍 Face Recognition:
-Sign In Confidence: ${currentOfficeData.signin_confidence}%
-Match: ${signinMatch ? '✅' : '❌'} (Threshold: ${MATCH_THRESHOLD}%)
-━━━━━━━━━━━━━━━━━━`;
-            window.open(`https://t.me/share/url?url=${encodeURIComponent(shareText)}`, '_blank');
-            alert('PDF generated. Please download and share via Telegram manually.');
-            downloadOfficePDF();
-            
-        } else if (platform === 'email') {
-            const subject = `Current Attendance: ${employeeName} - In Office`;
-            const body = `CURRENT ATTENDANCE STATUS\n\nEmployee: ${employeeName}\nID: ${currentOfficeData.employee_id || 'N/A'}\nMDA: ${currentOfficeData.mda || 'N/A'}\n\n⏰ Sign In Time: ${currentOfficeData.time_in}\nStatus: Currently In Office\n\n🔍 FACE RECOGNITION:\nSign In Confidence: ${currentOfficeData.signin_confidence}%\nMatch: ${signinMatch ? 'MATCH' : 'MISMATCH'}\nThreshold: ${MATCH_THRESHOLD}%\n\nThis is a real-time attendance status report.`;
-            window.location.href = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-            alert('PDF generated. Please attach the downloaded PDF to your email.');
-            downloadOfficePDF();
-        }
-    });
 }
 </script>
 

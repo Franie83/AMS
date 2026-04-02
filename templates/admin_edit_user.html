@@ -1,55 +1,123 @@
 {% extends "layout.html" %}
 {% block body %}
 <div class="row justify-content-center">
-    <div class="col-md-6">
+    <div class="col-md-8">
         <div class="card">
             <div class="card-header bg-primary text-white">
                 <h4 class="mb-0">✏️ Edit User: {{ user.name }}</h4>
             </div>
             <div class="card-body">
                 <form method="POST">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">Full Name <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control" name="name" value="{{ user.name }}" required>
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">Email <span class="text-danger">*</span></label>
+                                <input type="email" class="form-control" name="email" value="{{ user.email }}" required>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">Phone Number <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control" name="phone" value="{{ user.phone or '' }}" required>
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">MDA <span class="text-danger">*</span></label>
+                                <input type="text" class="form-control" name="mda" value="{{ user.mda or '' }}" required>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- NEW: MDA Attendance Link Field -->
                     <div class="mb-3">
-                        <label class="form-label">Full Name <span class="text-danger">*</span></label>
-                        <input type="text" class="form-control" name="name" value="{{ user.name }}" required>
+                        <label class="form-label">
+                            <i class="fas fa-link text-primary me-2"></i>MDA Attendance Link
+                        </label>
+                        <input type="url" class="form-control" name="mda_attendance_link" 
+                               value="{{ user.mda_attendance_link or '' }}" 
+                               placeholder="https://example.com/attendance">
+                        <small class="text-muted">
+                            <i class="fas fa-info-circle text-info me-1"></i>
+                            Custom attendance link for this MDA. This will be clickable in the user list.
+                        </small>
                     </div>
                     
-                    <div class="mb-3">
-                        <label class="form-label">Email <span class="text-danger">*</span></label>
-                        <input type="email" class="form-control" name="email" value="{{ user.email }}" required>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">Role <span class="text-danger">*</span></label>
+                                <select class="form-select" name="role" required>
+                                    <option value="user" {% if user.role == 'user' %}selected{% endif %}>👤 User</option>
+                                    <option value="mda_user" {% if user.role == 'mda_user' %}selected{% endif %}>🏢 MDA User</option>
+                                    <option value="admin" {% if user.role == 'admin' %}selected{% endif %}>🛡️ Admin</option>
+                                    <option value="superadmin" {% if user.role == 'superadmin' %}selected{% endif %}>👑 Super Admin</option>
+                                </select>
+                                <small class="text-muted">
+                                    <strong>User</strong> - Can register employees and take attendance<br>
+                                    <strong>MDA User</strong> - Can manage employees in their MDA<br>
+                                    <strong>Admin</strong> - Full access including user management<br>
+                                    <strong>Super Admin</strong> - Complete system control
+                                </small>
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">New Password (leave blank to keep current)</label>
+                                <input type="password" class="form-control" id="password" name="password">
+                                <div class="password-strength mt-2" id="passwordStrength" style="display: none;">
+                                    <div class="progress" style="height: 5px;">
+                                        <div class="progress-bar" role="progressbar" style="width: 0%;" id="strengthBar"></div>
+                                    </div>
+                                    <small class="text-muted" id="strengthText">Enter password</small>
+                                </div>
+                                <small class="text-muted d-block mt-2">
+                                    <i class="fas fa-info-circle me-1"></i>
+                                    Enter only if you want to change the password. Minimum 8 characters with mix of letters, numbers, and symbols.
+                                </small>
+                            </div>
+                        </div>
                     </div>
                     
-                    <div class="mb-3">
-                        <label class="form-label">Phone Number <span class="text-danger">*</span></label>
-                        <input type="text" class="form-control" name="phone" value="{{ user.phone or '' }}" required>
+                    <!-- NEW: Credentials Section (View Only) -->
+                    {% if user.credentials %}
+                    <div class="card mb-4 border-info">
+                        <div class="card-header bg-info text-white py-2">
+                            <h6 class="mb-0">
+                                <i class="fas fa-key me-2"></i>Stored Credentials (Read Only)
+                            </h6>
+                        </div>
+                        <div class="card-body p-3">
+                            <pre style="background: #f8f9fa; padding: 10px; border-radius: 5px; font-size: 12px; margin: 0; white-space: pre-wrap;">{{ user.credentials }}</pre>
+                            <div class="alert alert-warning mt-3 mb-0">
+                                <i class="fas fa-exclamation-triangle me-2"></i>
+                                <small>These credentials were saved when the user was created. To update credentials, modify the user details above and save.</small>
+                            </div>
+                        </div>
                     </div>
+                    {% endif %}
                     
-                    <div class="mb-3">
-                        <label class="form-label">MDA <span class="text-danger">*</span></label>
-                        <input type="text" class="form-control" name="mda" value="{{ user.mda or '' }}" required>
-                    </div>
+                    <hr class="mt-4 mb-4">
                     
-                    <div class="mb-3">
-                        <label class="form-label">Role <span class="text-danger">*</span></label>
-                        <select class="form-select" name="role" required>
-                            <option value="user" {% if user.role == 'user' %}selected{% endif %}>User</option>
-                            <option value="admin" {% if user.role == 'admin' %}selected{% endif %}>Admin</option>
-                            <option value="mda_user" {% if user.role == 'mda_user' %}selected{% endif %}>MDA User</option>
-                            <option value="superadmin" {% if user.role == 'superadmin' %}selected{% endif %}>Super Admin</option>
-                        </select>
-                    </div>
-                    
-                    <div class="mb-4">  <!-- Changed from mb-3 to mb-4 for more space -->
-                        <label class="form-label">New Password (leave blank to keep current)</label>
-                        <input type="password" class="form-control" name="password">
-                        <small class="text-muted d-block mt-2">Enter only if you want to change the password</small>
-                        <!-- Added d-block mt-2 for proper spacing -->
-                    </div>
-                    
-                    <hr class="mt-4 mb-4">  <!-- Added more margin top and bottom -->
-                    
-                    <div class="d-flex gap-2 mt-3">  <!-- Added mt-3 for top margin -->
-                        <button type="submit" class="btn btn-primary">💾 Save Changes</button>
-                        <a href="{{ url_for('admin_users') }}" class="btn btn-secondary">Cancel</a>
+                    <div class="d-flex gap-2 mt-3">
+                        <button type="submit" class="btn btn-primary" id="submitBtn">
+                            💾 Save Changes
+                        </button>
+                        <a href="{{ url_for('admin_users') }}" class="btn btn-secondary">
+                            Cancel
+                        </a>
                     </div>
                 </form>
             </div>
@@ -57,13 +125,93 @@
     </div>
 </div>
 
-<!-- Add bottom padding to the container -->
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const passwordInput = document.getElementById('password');
+    const strengthBar = document.getElementById('strengthBar');
+    const strengthText = document.getElementById('strengthText');
+    const passwordStrength = document.getElementById('passwordStrength');
+    const submitBtn = document.getElementById('submitBtn');
+    
+    // Password strength checker
+    passwordInput.addEventListener('input', function() {
+        const pwd = this.value;
+        
+        if (pwd.length > 0) {
+            passwordStrength.style.display = 'block';
+            
+            const lengthValid = pwd.length >= 8;
+            const upperValid = /[A-Z]/.test(pwd);
+            const lowerValid = /[a-z]/.test(pwd);
+            const numberValid = /[0-9]/.test(pwd);
+            const specialValid = /[!@#$%^&*(),.?":{}|<>]/.test(pwd);
+            
+            let strength = 0;
+            if (lengthValid) strength++;
+            if (upperValid) strength++;
+            if (lowerValid) strength++;
+            if (numberValid) strength++;
+            if (specialValid) strength++;
+            
+            const percentage = (strength / 5) * 100;
+            strengthBar.style.width = percentage + '%';
+            
+            if (strength === 0) {
+                strengthBar.className = 'progress-bar bg-secondary';
+                strengthText.textContent = 'Enter password';
+                submitBtn.disabled = false;
+            } else if (strength <= 2) {
+                strengthBar.className = 'progress-bar bg-danger';
+                strengthText.textContent = 'Weak password';
+                submitBtn.disabled = true;
+            } else if (strength <= 4) {
+                strengthBar.className = 'progress-bar bg-warning';
+                strengthText.textContent = 'Medium password';
+                submitBtn.disabled = true;
+            } else {
+                strengthBar.className = 'progress-bar bg-success';
+                strengthText.textContent = 'Strong password!';
+                submitBtn.disabled = false;
+            }
+        } else {
+            passwordStrength.style.display = 'none';
+            submitBtn.disabled = false;
+        }
+    });
+    
+    // Form validation before submit
+    document.querySelector('form').addEventListener('submit', function(e) {
+        const pwd = passwordInput.value;
+        
+        if (pwd.length > 0) {
+            const requirements = {
+                length: pwd.length >= 8,
+                upper: /[A-Z]/.test(pwd),
+                lower: /[a-z]/.test(pwd),
+                number: /[0-9]/.test(pwd),
+                special: /[!@#$%^&*(),.?":{}|<>]/.test(pwd)
+            };
+            
+            if (!requirements.length || !requirements.upper || !requirements.lower || 
+                !requirements.number || !requirements.special) {
+                e.preventDefault();
+                alert('Password must meet all requirements:\n' +
+                      '- At least 8 characters\n' +
+                      '- One uppercase letter\n' +
+                      '- One lowercase letter\n' +
+                      '- One number\n' +
+                      '- One special character (!@#$%^&*)');
+            }
+        }
+    });
+});
+</script>
+
 <style>
 .row.justify-content-center {
     margin-bottom: 50px;
     padding-bottom: 30px;
 }
-/* Ensure proper spacing in the form */
 .mb-4 {
     margin-bottom: 1.5rem !important;
 }
@@ -78,6 +226,41 @@
 }
 .d-block {
     display: block !important;
+}
+.form-control, .form-select {
+    border-radius: 10px;
+    border: 2px solid #e1e5e9;
+    transition: all 0.3s ease;
+}
+.form-control:focus, .form-select:focus {
+    border-color: #667eea;
+    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}
+.btn-primary {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border: none;
+    border-radius: 10px;
+    padding: 10px 20px;
+    transition: all 0.3s ease;
+}
+.btn-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 5px 15px rgba(102, 126, 234, 0.3);
+}
+.btn-secondary {
+    border-radius: 10px;
+    padding: 10px 20px;
+}
+.border-info {
+    border-color: #17a2b8 !important;
+}
+pre {
+    font-size: 12px;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    background: #f8f9fa;
+    padding: 10px;
+    border-radius: 5px;
 }
 </style>
 {% endblock %}

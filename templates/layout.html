@@ -3,9 +3,43 @@
 <head>
   <meta charset="utf-8">
   <title>Attendance App</title>
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+  <!-- LOCAL Bootstrap CSS (No internet needed) -->
+  <link href="{{ url_for('static', filename='css/bootstrap.min.css') }}" rel="stylesheet">
+  <!-- LOCAL Font Awesome (No internet needed) -->
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/all.min.css') }}">
   <style>
+    body {
+      background-color: {{ background_color }};
+      {% if background_image %}
+      background-image: url('{{ url_for('uploads', filename='backgrounds/' + background_image) }}');
+      background-size: {{ background_style }};
+      background-position: {{ background_position }};
+      background-attachment: {{ background_attachment }};
+      {% endif %}
+      min-height: 100vh;
+      transition: all 0.3s ease;
+    }
+    
+    /* Make cards semi-transparent to show background */
+    .card, .navbar, .sidebar, .dropdown-menu, .modal-content, .alert {
+      background-color: rgba(255, 255, 255, 0.95);
+      backdrop-filter: blur(2px);
+    }
+    
+    /* Navbar background - slightly more opaque for readability */
+    .navbar {
+      background-color: rgba(13, 110, 253, 0.95) !important;
+    }
+    
+    /* Container background */
+    .container {
+      background-color: rgba(255, 255, 255, 0.9);
+      border-radius: 15px;
+      padding: 20px;
+      margin-top: 20px;
+      margin-bottom: 20px;
+    }
+    
     .camera { width: 480px; height:360px; border:1px solid #ddd; }
     .navbar-nav .nav-link {
       padding: 0.5rem 1rem;
@@ -16,7 +50,7 @@
       border-radius: 5px;
     }
     .dropdown-menu {
-      background-color: #f8f9fa;
+      background-color: rgba(248, 249, 250, 0.98);
       border: none;
       box-shadow: 0 2px 10px rgba(0,0,0,0.1);
     }
@@ -63,6 +97,7 @@
       border-radius: 10px;
       margin-left: 5px;
       vertical-align: middle;
+      animation: pulse 1s infinite;
     }
     /* MDA badge style */
     .mda-badge {
@@ -79,19 +114,40 @@
         opacity: 1;
       }
       50% {
-        opacity: 0.7;
+        opacity: 0.5;
       }
       100% {
         opacity: 1;
       }
     }
+    
+    /* Card styling for better readability */
+    .card {
+      border: none;
+      border-radius: 15px;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    }
+    
+    .card-header {
+      border-radius: 15px 15px 0 0 !important;
+    }
+    
+    /* Table styling */
+    .table {
+      background-color: rgba(255, 255, 255, 0.95);
+    }
+    
+    /* Modal styling */
+    .modal-content {
+      background-color: rgba(255, 255, 255, 0.98);
+    }
   </style>
 </head>
-<body class="bg-light">
+<body>
 <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
   <div class="container-fluid">
     <a class="navbar-brand" href="{{ url_for('dashboard') }}">
-      <i class="fas fa-clock me-2"></i>Attendance System
+      <i class="fas fa-clock me-2"></i>EDSG ATTENDANCE MANAGEMENT SYSTEM
     </a>
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
       <span class="navbar-toggler-icon"></span>
@@ -182,6 +238,13 @@
                 <i class="fas fa-crown me-1"></i>Super Admin
               </a>
               <ul class="dropdown-menu dropdown-menu-end">
+                <!-- Background Settings Link -->
+                <li>
+                  <a class="dropdown-item" href="{{ url_for('admin_background') }}">
+                    <i class="fas fa-image text-info"></i> Background Settings
+                    <span class="mda-badge">NEW</span>
+                  </a>
+                </li>
                 <!-- MDA Onboarding Link -->
                 <li>
                   <a class="dropdown-item" href="{{ url_for('onboard_mda') }}">
@@ -339,7 +402,8 @@
   {% block body %}{% endblock %}
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+<!-- LOCAL Bootstrap JS (No internet needed) -->
+<script src="{{ url_for('static', filename='js/bootstrap.bundle.min.js') }}"></script>
 <script>
   // Auto-dismiss alerts after 5 seconds
   document.addEventListener('DOMContentLoaded', function() {

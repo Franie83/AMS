@@ -60,6 +60,20 @@
   </div>
 </div>
 
+<!-- Export Buttons -->
+<div class="row mb-3">
+  <div class="col">
+    <div class="btn-group" role="group">
+      <button class="btn btn-success" onclick="exportToExcel()">
+        <i class="fas fa-file-excel me-2"></i>Export to Excel
+      </button>
+      <button class="btn btn-danger" onclick="exportToPDF()">
+        <i class="fas fa-file-pdf me-2"></i>Export to PDF
+      </button>
+    </div>
+  </div>
+</div>
+
 <div class="row mb-2">
   <div class="col">
     <strong>Total Employees:</strong> {{ employees|length }}
@@ -76,24 +90,22 @@
 <div class="table-responsive">
   <table class="table table-hover table-bordered" id="employeesTable">
     <thead class="table-dark">
-      <tr>
+       …
         <th>EmpID</th>
         <th>Name</th>
         <th>MDA</th>
         <th>Email</th>
         <th>Phone</th>
         <th>Role</th>
-        <th>User Account</th>
         <th>Registered Image</th>
         <th>Face Quality</th>
         <th>Status</th>
         <th>Actions</th>
-      </tr>
-    </thead>
+       </thead>
     <tbody>
       {% for item in employees %}
       {% set e = item.employee %}
-      <tr class="employee-row {% if not e.is_active %}table-secondary{% endif %}" data-id="{{ e.id }}" data-employeeid="{{ e.employeeid }}" style="cursor: pointer;">
+      <tr class="employee-row {% if not e.is_active %}table-secondary{% endif %}" data-id="{{ e.id }}" data-employeeid="{{ e.employeeid }}" data-index="{{ loop.index0 }}" style="cursor: pointer;">
         <td><strong>{{ e.employeeid }}</strong></td>
         <td>{{ e.name }}</td>
         <td>{{ e.mda or 'N/A' }}</td>
@@ -108,27 +120,6 @@
             <span class="badge bg-warning">Supervisor</span>
           {% else %}
             <span class="badge bg-primary">Employee</span>
-          {% endif %}
-        </td>
-        <td>
-          {% if item.has_user %}
-            <span class="badge bg-success" title="Has user account">
-              <i class="fas fa-check-circle me-1"></i>Has User
-            </span>
-            {% if item.user_account %}
-            <small class="d-block text-muted">
-              Role: <span class="badge bg-secondary">{{ item.user_account.role }}</span>
-            </small>
-            {% endif %}
-          {% else %}
-            <span class="badge bg-secondary" title="No user account">
-              <i class="fas fa-times-circle me-1"></i>No User
-            </span>
-            {% if user_role == 'superadmin' and e.email %}
-            <button class="btn btn-sm btn-outline-success mt-1" onclick="createUserAccount({{ e.id }}, '{{ e.email }}')">
-              <i class="fas fa-user-plus me-1"></i>Create User
-            </button>
-            {% endif %}
           {% endif %}
         </td>
         <td class="text-center" onclick="event.stopPropagation();">
@@ -197,7 +188,7 @@
       </tr>
       {% else %}
       <tr>
-        <td colspan="11" class="text-center py-4">
+        <td colspan="10" class="text-center py-4">
           <div class="display-6 text-muted mb-3">👥</div>
           <h5>No employees found</h5>
           <p class="text-muted">
@@ -219,7 +210,7 @@
   </table>
 </div>
 
-<!-- Employee Receipt Modal -->
+<!-- Employee Receipt Modal with Navigation -->
 <div class="modal fade" id="employeeReceiptModal" tabindex="-1" aria-labelledby="employeeReceiptModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-lg">
         <div class="modal-content">
@@ -227,6 +218,14 @@
                 <h5 class="modal-title" id="employeeReceiptModalLabel">
                     <i class="fas fa-id-card me-2"></i>EMPLOYEE DETAILS
                 </h5>
+                <div class="btn-group me-2" role="group">
+                    <button type="button" class="btn btn-sm btn-outline-light" id="prevEmpBtn" onclick="navigateEmployee('prev')">
+                        <i class="fas fa-chevron-left"></i> Prev
+                    </button>
+                    <button type="button" class="btn btn-sm btn-outline-light" id="nextEmpBtn" onclick="navigateEmployee('next')">
+                        Next <i class="fas fa-chevron-right"></i>
+                    </button>
+                </div>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body" id="employeeReceiptContent">
@@ -238,21 +237,28 @@
                 </div>
             </div>
             <div class="modal-footer">
-                <div class="btn-group w-100" role="group">
-                    <button class="btn btn-success" onclick="downloadEmployeePDF()">
-                        <i class="fas fa-file-pdf me-2"></i>Download PDF
+                <div class="btn-group me-auto" role="group">
+                    <button class="btn btn-secondary" onclick="goBackToEmployeesPage()">
+                        <i class="fas fa-arrow-left me-2"></i>Back to Employees
                     </button>
-                    <button class="btn btn-info" onclick="shareEmployeePDF('whatsapp')">
-                        <i class="fab fa-whatsapp me-2"></i>WhatsApp
-                    </button>
-                    <button class="btn btn-primary" onclick="shareEmployeePDF('telegram')">
-                        <i class="fab fa-telegram me-2"></i>Telegram
-                    </button>
-                    <button class="btn btn-secondary" onclick="shareEmployeePDF('email')">
-                        <i class="fas fa-envelope me-2"></i>Email
+                    <button class="btn btn-primary" onclick="downloadEmployeeAsJPG()">
+                        <i class="fas fa-download me-2"></i>Download as JPG
                     </button>
                 </div>
-                <button type="button" class="btn btn-secondary w-100 mt-2" data-bs-dismiss="modal">Close</button>
+                <div class="btn-group" role="group">
+                    <button class="btn btn-success" onclick="shareEmployeeCard('whatsapp')">
+                        <i class="fab fa-whatsapp me-2"></i>WhatsApp
+                    </button>
+                    <button class="btn btn-info" onclick="shareEmployeeCard('telegram')">
+                        <i class="fab fa-telegram me-2"></i>Telegram
+                    </button>
+                    <button class="btn btn-primary" onclick="shareEmployeeCard('facebook')">
+                        <i class="fab fa-facebook me-2"></i>Facebook
+                    </button>
+                    <button class="btn btn-secondary" onclick="shareEmployeeCard('copy')">
+                        <i class="fas fa-copy me-2"></i>Copy
+                    </button>
+                </div>
             </div>
         </div>
     </div>
@@ -273,82 +279,40 @@
   </div>
 </div>
 
-<!-- Create User Modal -->
-<div class="modal fade" id="createUserModal" tabindex="-1">
-  <div class="modal-dialog">
-    <div class="modal-content">
-      <div class="modal-header bg-success text-white">
-        <h5 class="modal-title">
-          <i class="fas fa-user-plus me-2"></i>Create User Account
-        </h5>
-        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
-      </div>
-      <div class="modal-body">
-        <form id="createUserForm">
-          <input type="hidden" id="create_user_employee_id" name="employee_id">
-          
-          <div class="mb-3">
-            <label class="form-label">Email</label>
-            <input type="email" class="form-control" id="create_user_email" readonly>
-          </div>
-          
-          <div class="mb-3">
-            <label class="form-label">Password</label>
-            <input type="password" class="form-control" id="create_user_password" required>
-          </div>
-          
-          <div class="mb-3">
-            <label class="form-label">Confirm Password</label>
-            <input type="password" class="form-control" id="create_user_confirm" required>
-          </div>
-          
-          <div class="password-requirements mt-2 mb-3">
-            <small class="text-muted">Password must contain:</small>
-            <ul class="list-unstyled mt-1">
-              <li id="reqLength" class="text-danger">
-                <i class="fas fa-times-circle me-1"></i>At least 8 characters
-              </li>
-              <li id="reqUpper" class="text-danger">
-                <i class="fas fa-times-circle me-1"></i>One uppercase letter
-              </li>
-              <li id="reqLower" class="text-danger">
-                <i class="fas fa-times-circle me-1"></i>One lowercase letter
-              </li>
-              <li id="reqNumber" class="text-danger">
-                <i class="fas fa-times-circle me-1"></i>One number
-              </li>
-              <li id="reqSpecial" class="text-danger">
-                <i class="fas fa-times-circle me-1"></i>One special character (!@#$%^&*)
-              </li>
-            </ul>
-          </div>
-        </form>
-      </div>
-      <div class="modal-footer">
-        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-        <button type="button" class="btn btn-success" onclick="submitCreateUser()">Create Account</button>
-      </div>
-    </div>
-  </div>
-</div>
+<!-- Create User Modal - REMOVED -->
 
-<!-- html2pdf library -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+<!-- Include required libraries -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
 
 <script>
 let imageModal;
-let createUserModal;
 let currentEmployeeData = null;
 let currentReceiptElement = null;
+let currentEmployeeId = null;
+let allEmployees = [];
 
 document.addEventListener('DOMContentLoaded', function() {
   imageModal = new bootstrap.Modal(document.getElementById('imageModal'));
-  createUserModal = new bootstrap.Modal(document.getElementById('createUserModal'));
+  
+  // Collect all employee IDs from the table
+  document.querySelectorAll('.employee-row').forEach(row => {
+    allEmployees.push({
+      id: parseInt(row.dataset.id),
+      employeeid: row.dataset.employeeid,
+      index: parseInt(row.dataset.index),
+      element: row
+    });
+  });
+  
+  // Sort by ID
+  allEmployees.sort((a, b) => a.id - b.id);
   
   // Make employee rows clickable
   document.querySelectorAll('.employee-row').forEach(row => {
     row.addEventListener('click', function(e) {
-      // Don't trigger if clicking on buttons or images
       if (e.target.tagName === 'BUTTON' || 
           e.target.tagName === 'A' || 
           e.target.tagName === 'I' ||
@@ -357,169 +321,218 @@ document.addEventListener('DOMContentLoaded', function() {
           e.target.tagName === 'IMG') {
         return;
       }
-      const id = this.dataset.id;
+      const id = parseInt(this.dataset.id);
       const employeeId = this.dataset.employeeid;
+      currentEmployeeId = id;
       showEmployeeReceipt(id, employeeId);
     });
   });
-  
-  // Password strength checker
-  const passwordInput = document.getElementById('create_user_password');
-  if (passwordInput) {
-    passwordInput.addEventListener('input', checkPasswordStrength);
-  }
-  
-  const confirmInput = document.getElementById('create_user_confirm');
-  if (confirmInput) {
-    confirmInput.addEventListener('input', checkPasswordMatch);
-  }
 });
+
+function exportToExcel() {
+  const table = document.getElementById('employeesTable');
+  const rows = table.querySelectorAll('tr');
+  
+  const data = [];
+  rows.forEach(row => {
+    const rowData = [];
+    const cells = row.querySelectorAll('th, td');
+    cells.forEach((cell, index) => {
+      // Skip the Actions column (last column)
+      if (index < cells.length - 1) {
+        rowData.push(cell.innerText.trim());
+      }
+    });
+    if (rowData.length > 0) {
+      data.push(rowData);
+    }
+  });
+  
+  const ws = XLSX.utils.aoa_to_sheet(data);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Employees');
+  
+  const fileName = `Employees_${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.xlsx`;
+  XLSX.writeFile(wb, fileName);
+}
+
+function exportToPDF() {
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF('landscape', 'mm', 'a4');
+  
+  const table = document.getElementById('employeesTable');
+  const headers = [];
+  const data = [];
+  
+  const headerRow = table.querySelector('thead tr');
+  if (headerRow) {
+    headerRow.querySelectorAll('th').forEach(th => {
+      headers.push(th.innerText.trim());
+    });
+    // Remove the last header (Actions)
+    headers.pop();
+  }
+  
+  const bodyRows = table.querySelectorAll('tbody tr');
+  bodyRows.forEach(row => {
+    const rowData = [];
+    const cells = row.querySelectorAll('td');
+    cells.forEach((cell, index) => {
+      if (index < cells.length - 1) {
+        rowData.push(cell.innerText.trim());
+      }
+    });
+    if (rowData.length > 0) {
+      data.push(rowData);
+    }
+  });
+  
+  doc.setFontSize(18);
+  doc.text('Employee List', 14, 15);
+  doc.setFontSize(10);
+  doc.text(`Generated: ${new Date().toLocaleString()}`, 14, 22);
+  doc.text(`Total Employees: ${data.length}`, 14, 28);
+  
+  doc.autoTable({
+    head: [headers],
+    body: data,
+    startY: 35,
+    styles: { fontSize: 8, cellPadding: 2 },
+    headStyles: { fillColor: [13, 110, 253], textColor: 255 },
+    alternateRowStyles: { fillColor: [245, 245, 245] }
+  });
+  
+  const fileName = `Employees_${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.pdf`;
+  doc.save(fileName);
+}
+
+function goBackToEmployeesPage() {
+  const modal = bootstrap.Modal.getInstance(document.getElementById('employeeReceiptModal'));
+  modal.hide();
+  
+  const employeesTable = document.getElementById('employeesTable');
+  if (employeesTable) {
+    employeesTable.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+  
+  if (currentEmployeeId) {
+    const row = document.querySelector(`.employee-row[data-id="${currentEmployeeId}"]`);
+    if (row) {
+      row.style.transition = 'background-color 0.5s';
+      row.style.backgroundColor = '#fff3cd';
+      setTimeout(() => {
+        row.style.backgroundColor = '';
+      }, 2000);
+    }
+  }
+}
+
+function navigateEmployee(direction) {
+  if (!currentEmployeeId) return;
+  
+  const currentIndex = allEmployees.findIndex(r => r.id === currentEmployeeId);
+  if (currentIndex === -1) return;
+  
+  let newIndex;
+  if (direction === 'prev') {
+    newIndex = currentIndex - 1;
+    if (newIndex < 0) {
+      alert('This is the first employee');
+      return;
+    }
+  } else {
+    newIndex = currentIndex + 1;
+    if (newIndex >= allEmployees.length) {
+      alert('This is the last employee');
+      return;
+    }
+  }
+  
+  const newRecord = allEmployees[newIndex];
+  currentEmployeeId = newRecord.id;
+  showEmployeeReceipt(newRecord.id, newRecord.employeeid);
+}
+
+function downloadEmployeeAsJPG() {
+  const receiptElement = document.getElementById('employeeReceiptContent');
+  const originalContent = receiptElement.innerHTML;
+  
+  receiptElement.style.backgroundColor = '#f8f9fa';
+  receiptElement.style.padding = '20px';
+  
+  html2canvas(receiptElement, {
+    scale: 2,
+    backgroundColor: '#ffffff',
+    logging: false,
+    useCORS: true
+  }).then(canvas => {
+    const link = document.createElement('a');
+    const timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, '-');
+    const employeeName = currentEmployeeData ? currentEmployeeData.name.replace(/\s+/g, '_') : 'employee';
+    link.download = `${employeeName}_ID_Card_${timestamp}.jpg`;
+    link.href = canvas.toDataURL('image/jpeg', 0.95);
+    link.click();
+    
+    receiptElement.innerHTML = originalContent;
+    receiptElement.style.backgroundColor = '';
+    receiptElement.style.padding = '';
+  }).catch(error => {
+    console.error('Error generating image:', error);
+    alert('Error generating image. Please try again.');
+    receiptElement.innerHTML = originalContent;
+    receiptElement.style.backgroundColor = '';
+    receiptElement.style.padding = '';
+  });
+}
+
+function shareEmployeeCard(platform) {
+  if (!currentEmployeeData) return;
+  
+  const data = currentEmployeeData;
+  const shareText = `👤 EMPLOYEE ID CARD
+━━━━━━━━━━━━━━━━━━
+Name: ${data.name}
+Employee ID: ${data.employeeid}
+MDA: ${data.mda}
+Email: ${data.email}
+Phone: ${data.phone}
+Role: ${data.role}
+Face Quality: ${data.face_quality}
+━━━━━━━━━━━━━━━━━━
+Registered: ${data.created_at}
+Generated: ${new Date().toLocaleString()}`;
+
+  const encodedText = encodeURIComponent(shareText);
+  
+  switch(platform) {
+    case 'whatsapp':
+      window.open(`https://wa.me/?text=${encodedText}`, '_blank');
+      break;
+    case 'telegram':
+      window.open(`https://t.me/share/url?url=${encodedText}`, '_blank');
+      break;
+    case 'facebook':
+      window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodedText}`, '_blank');
+      break;
+    case 'copy':
+      navigator.clipboard.writeText(shareText).then(() => {
+        alert('Employee card details copied to clipboard!');
+      }).catch(() => {
+        alert('Failed to copy to clipboard');
+      });
+      break;
+  }
+}
 
 function showImage(src) {
   document.getElementById('modalImage').src = src;
   imageModal.show();
 }
 
-function createUserAccount(employeeId, email) {
-  document.getElementById('create_user_employee_id').value = employeeId;
-  document.getElementById('create_user_email').value = email;
-  document.getElementById('create_user_password').value = '';
-  document.getElementById('create_user_confirm').value = '';
-  createUserModal.show();
-}
-
-function checkPasswordStrength() {
-  const password = document.getElementById('create_user_password').value;
-  
-  // Check length
-  const lengthValid = password.length >= 8;
-  updateRequirement('reqLength', lengthValid);
-  
-  // Check uppercase
-  const upperValid = /[A-Z]/.test(password);
-  updateRequirement('reqUpper', upperValid);
-  
-  // Check lowercase
-  const lowerValid = /[a-z]/.test(password);
-  updateRequirement('reqLower', lowerValid);
-  
-  // Check number
-  const numberValid = /[0-9]/.test(password);
-  updateRequirement('reqNumber', numberValid);
-  
-  // Check special character
-  const specialValid = /[!@#$%^&*(),.?":{}|<>]/.test(password);
-  updateRequirement('reqSpecial', specialValid);
-  
-  checkPasswordMatch();
-}
-
-function updateRequirement(elementId, isValid) {
-  const element = document.getElementById(elementId);
-  if (element) {
-    const icon = element.querySelector('i');
-    if (isValid) {
-      element.classList.remove('text-danger');
-      element.classList.add('text-success');
-      icon.classList.remove('fa-times-circle');
-      icon.classList.add('fa-check-circle');
-    } else {
-      element.classList.remove('text-success');
-      element.classList.add('text-danger');
-      icon.classList.remove('fa-check-circle');
-      icon.classList.add('fa-times-circle');
-    }
-  }
-}
-
-function checkPasswordMatch() {
-  const password = document.getElementById('create_user_password').value;
-  const confirm = document.getElementById('create_user_confirm').value;
-  
-  const confirmInput = document.getElementById('create_user_confirm');
-  
-  if (confirm.length > 0 && password !== confirm) {
-    confirmInput.classList.add('is-invalid');
-    return false;
-  } else {
-    confirmInput.classList.remove('is-invalid');
-    return true;
-  }
-}
-
-async function submitCreateUser() {
-  const employeeId = document.getElementById('create_user_employee_id').value;
-  const password = document.getElementById('create_user_password').value;
-  const confirm = document.getElementById('create_user_confirm').value;
-  
-  if (!password) {
-    alert('Password is required');
-    return;
-  }
-  
-  if (password !== confirm) {
-    alert('Passwords do not match');
-    return;
-  }
-  
-  // Check password strength
-  const requirements = {
-    length: password.length >= 8,
-    upper: /[A-Z]/.test(password),
-    lower: /[a-z]/.test(password),
-    number: /[0-9]/.test(password),
-    special: /[!@#$%^&*(),.?":{}|<>]/.test(password)
-  };
-  
-  if (!requirements.length || !requirements.upper || !requirements.lower || 
-      !requirements.number || !requirements.special) {
-    alert('Password must meet all requirements');
-    return;
-  }
-  
-  try {
-    // Get employee data from the row
-    const row = document.querySelector(`.employee-row[data-id="${employeeId}"]`);
-    const name = row.cells[1].innerText;
-    const mda = row.cells[2].innerText === 'N/A' ? '' : row.cells[2].innerText;
-    const email = document.getElementById('create_user_email').value;
-    const phone = row.cells[4].innerText === 'N/A' ? '' : row.cells[4].innerText;
-    
-    const formData = new URLSearchParams();
-    formData.append('user_action', 'create');
-    formData.append('new_password', password);
-    formData.append('confirm_password', confirm);
-    formData.append('name', name);
-    formData.append('mda', mda);
-    formData.append('email', email);
-    formData.append('phone', phone);
-    formData.append('role', 'employee');
-    
-    const response = await fetch(`/employees/edit/${employeeId}`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-      },
-      body: formData
-    });
-    
-    if (response.redirected) {
-      window.location.href = response.url;
-    } else {
-      const result = await response.text();
-      createUserModal.hide();
-      location.reload();
-    }
-  } catch (error) {
-    alert('Error creating user account: ' + error.message);
-  }
-}
-
 async function showEmployeeReceipt(id, employeeId) {
     const modal = new bootstrap.Modal(document.getElementById('employeeReceiptModal'));
     const content = document.getElementById('employeeReceiptContent');
     
-    // Show loading
     content.innerHTML = `
         <div class="text-center mb-4">
             <div class="spinner-border text-primary" role="status">
@@ -532,25 +545,19 @@ async function showEmployeeReceipt(id, employeeId) {
     modal.show();
     
     try {
-        // Find the record from the table data
         const row = document.querySelector(`.employee-row[data-id="${id}"]`);
         if (!row) throw new Error('Employee not found');
         
         const cells = row.cells;
         
-        // Get image source
-        const imgElement = cells[7].querySelector('img');
-        
-        // Extract face quality
-        const qualityElement = cells[8].querySelector('.progress-bar');
+        const imgElement = cells[6].querySelector('img');
+        const qualityElement = cells[7].querySelector('.progress-bar');
         const qualityText = qualityElement ? qualityElement.innerText : 'N/A';
         
-        // Get role badge text
         const roleBadge = cells[5].querySelector('.badge');
         const roleText = roleBadge ? roleBadge.innerText : cells[5].innerText.trim();
         
-        // Get role color
-        let roleColor = '#0d6efd'; // default blue
+        let roleColor = '#0d6efd';
         if (roleText.includes('Director')) roleColor = '#8e44ad';
         else if (roleText.includes('Manager')) roleColor = '#dc3545';
         else if (roleText.includes('Supervisor')) roleColor = '#ffc107';
@@ -571,12 +578,23 @@ async function showEmployeeReceipt(id, employeeId) {
         
         currentEmployeeData = data;
         
-        // Generate receipt HTML
-        const receiptHTML = generateEmployeeReceiptHTML(data);
+        const currentIndex = allEmployees.findIndex(r => r.id === id);
+        const totalEmployees = allEmployees.length;
+        
+        const receiptHTML = generateEmployeeReceiptHTML(data, currentIndex + 1, totalEmployees);
         content.innerHTML = receiptHTML;
         
-        // Store reference to receipt element for PDF generation
         currentReceiptElement = content.querySelector('.receipt-container');
+        
+        const prevBtn = document.getElementById('prevEmpBtn');
+        const nextBtn = document.getElementById('nextEmpBtn');
+        
+        if (prevBtn) {
+            prevBtn.disabled = (currentIndex === 0);
+        }
+        if (nextBtn) {
+            nextBtn.disabled = (currentIndex === totalEmployees - 1);
+        }
         
     } catch (error) {
         content.innerHTML = `
@@ -588,17 +606,18 @@ async function showEmployeeReceipt(id, employeeId) {
     }
 }
 
-function generateEmployeeReceiptHTML(data) {
+function generateEmployeeReceiptHTML(data, currentPosition, totalEmployees) {
     return `
         <div class="receipt-container" style="font-family: 'Courier New', monospace; background: white; padding: 20px; border-radius: 10px; max-width: 100%;">
-            <!-- Header -->
             <div class="text-center mb-4">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <span class="badge bg-secondary">Employee ${currentPosition} of ${totalEmployees}</span>
+                </div>
                 <h4 style="color: #0d6efd; margin: 0;">👤 EMPLOYEE IDENTITY CARD</h4>
                 <div style="border-bottom: 2px dashed #0d6efd; margin: 10px 0;"></div>
                 <small style="color: #6c757d;">Employee ID: ${data.employeeid}</small>
             </div>
             
-            <!-- Photo and Basic Info -->
             <div style="display: flex; margin-bottom: 20px;">
                 <div style="width: 120px; text-align: center;">
                     ${data.photo ? 
@@ -607,38 +626,21 @@ function generateEmployeeReceiptHTML(data) {
                 </div>
                 <div style="flex: 1; margin-left: 20px;">
                     <table style="width: 100%; border-collapse: collapse;">
-                        <tr>
-                            <td style="padding: 4px; font-weight: bold; width: 80px;">Name:</td>
-                            <td style="padding: 4px;">${data.name}</td>
-                        </tr>
-                        <tr>
-                            <td style="padding: 4px; font-weight: bold;">ID:</td>
-                            <td style="padding: 4px;"><strong>${data.employeeid}</strong></td>
-                        </tr>
-                        <tr>
-                            <td style="padding: 4px; font-weight: bold;">MDA:</td>
-                            <td style="padding: 4px;">${data.mda}</td>
-                        </tr>
+                        <tr><td style="padding: 4px; font-weight: bold; width: 80px;">Name:</td><td style="padding: 4px;">${data.name}</td></tr>
+                        <tr><td style="padding: 4px; font-weight: bold;">ID:</td><td style="padding: 4px;"><strong>${data.employeeid}</strong></td></tr>
+                        <tr><td style="padding: 4px; font-weight: bold;">MDA:</td><td style="padding: 4px;">${data.mda}</td></tr>
                     </table>
                 </div>
             </div>
             
-            <!-- Contact Details -->
             <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; margin-bottom: 15px;">
                 <h6 style="color: #0d6efd; margin: 0 0 10px 0;">📞 Contact Information</h6>
                 <table style="width: 100%; border-collapse: collapse;">
-                    <tr>
-                        <td style="padding: 6px; font-weight: bold; width: 80px;">Email:</td>
-                        <td style="padding: 6px;">${data.email}</td>
-                    </tr>
-                    <tr>
-                        <td style="padding: 6px; font-weight: bold;">Phone:</td>
-                        <td style="padding: 6px;">${data.phone}</td>
-                    </tr>
+                    <tr><td style="padding: 6px; font-weight: bold; width: 80px;">Email:</td><td style="padding: 6px;">${data.email}</td></tr>
+                    <tr><td style="padding: 6px; font-weight: bold;">Phone:</td><td style="padding: 6px;">${data.phone}</td></tr>
                 </table>
             </div>
             
-            <!-- Role and Quality -->
             <div style="display: flex; gap: 10px; margin-bottom: 15px;">
                 <div style="flex: 1; background: #f8f9fa; padding: 15px; border-radius: 8px; text-align: center;">
                     <strong>Role:</strong><br>
@@ -654,15 +656,13 @@ function generateEmployeeReceiptHTML(data) {
                 </div>
             </div>
             
-            <!-- Registration Date -->
             <div style="background: #e9ecef; padding: 10px; border-radius: 8px; text-align: center; margin-bottom: 15px;">
                 <small style="color: #6c757d;">
                     <i class="fas fa-calendar-alt"></i> Registered: ${data.created_at}
                 </small>
             </div>
             
-            <!-- Footer -->
-            <div style="text-align: center;">
+            <div class="text-center">
                 <div style="border-top: 1px dashed #0d6efd; padding-top: 10px;">
                     <small style="color: #6c757d;">
                         Generated on ${new Date().toLocaleString()}<br>
@@ -672,71 +672,6 @@ function generateEmployeeReceiptHTML(data) {
             </div>
         </div>
     `;
-}
-
-function downloadEmployeePDF() {
-    if (!currentReceiptElement) {
-        alert('No receipt to download');
-        return;
-    }
-    
-    const employeeName = currentEmployeeData ? currentEmployeeData.name : 'employee';
-    const filename = `${employeeName}_ID_Card.pdf`.replace(/\s+/g, '_');
-    
-    const opt = {
-        margin: [0.5, 0.5, 0.5, 0.5],
-        filename: filename,
-        image: { type: 'jpeg', quality: 0.98 },
-        html2canvas: { scale: 2, logging: false, letterRendering: true },
-        jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' }
-    };
-    
-    html2pdf().set(opt).from(currentReceiptElement).save();
-}
-
-function shareEmployeePDF(platform) {
-    if (!currentReceiptElement) {
-        alert('No receipt to share');
-        return;
-    }
-    
-    const employeeName = currentEmployeeData ? currentEmployeeData.name : 'employee';
-    const filename = `${employeeName}_ID_Card.pdf`.replace(/\s+/g, '_');
-    
-    // Generate PDF as blob
-    const opt = {
-        margin: [0.5, 0.5, 0.5, 0.5],
-        filename: filename,
-        image: { type: 'jpeg', quality: 0.98 },
-        html2canvas: { scale: 2, logging: false, letterRendering: true },
-        jsPDF: { unit: 'in', format: 'a4', orientation: 'portrait' }
-    };
-    
-    html2pdf().set(opt).from(currentReceiptElement).outputPdf().then((pdfBlob) => {
-        // Create a blob URL
-        const blob = new Blob([pdfBlob], { type: 'application/pdf' });
-        const url = URL.createObjectURL(blob);
-        
-        if (platform === 'whatsapp') {
-            const shareText = `📄 Employee ID Card for ${currentEmployeeData.name}\nDownload PDF: ${window.location.origin}/download_temp?file=${filename}`;
-            window.open(`https://wa.me/?text=${encodeURIComponent(shareText)}`, '_blank');
-            alert('PDF generated. Please download and share via WhatsApp manually.');
-            downloadEmployeePDF();
-            
-        } else if (platform === 'telegram') {
-            const shareText = `📄 Employee ID Card for ${currentEmployeeData.name}\nDownload PDF: ${window.location.origin}/download_temp?file=${filename}`;
-            window.open(`https://t.me/share/url?url=${encodeURIComponent(shareText)}`, '_blank');
-            alert('PDF generated. Please download and share via Telegram manually.');
-            downloadEmployeePDF();
-            
-        } else if (platform === 'email') {
-            const subject = `Employee ID Card: ${currentEmployeeData.name}`;
-            const body = `Please find attached the employee ID card for ${currentEmployeeData.name}.\n\nEmployee ID: ${currentEmployeeData.employeeid}\nMDA: ${currentEmployeeData.mda}`;
-            window.location.href = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-            alert('PDF generated. Please attach the downloaded PDF to your email.');
-            downloadEmployeePDF();
-        }
-    });
 }
 
 async function deleteEmp(id, name) {
@@ -768,7 +703,6 @@ async function deleteEmp(id, name) {
   }
 }
 
-// New restore function
 async function restoreEmp(id, name) {
   if (!confirm(`Restore employee ${name}?`)) return;
   
@@ -786,7 +720,6 @@ async function restoreEmp(id, name) {
   }
 }
 
-// New permanent delete function
 async function permanentDeleteEmp(id, name) {
   if (!confirm(`⚠️ PERMANENTLY DELETE ${name}?\nThis action cannot be undone!`)) return;
   
@@ -853,19 +786,6 @@ img:hover {
 }
 .modal-lg {
   max-width: 700px;
-}
-.password-requirements {
-  background-color: #f8f9fa;
-  border-radius: 8px;
-  padding: 10px;
-  font-size: 0.9rem;
-}
-.password-requirements li {
-  transition: all 0.3s;
-}
-.text-success i, .text-danger i {
-  margin-right: 8px;
-  width: 16px;
 }
 </style>
 {% endblock %}

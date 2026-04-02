@@ -25,7 +25,7 @@
                     <!-- Permission Notice -->
                     {% if user_role == 'superadmin' %}
                         <div class="alert alert-info">
-                            <i class="fas fa-crown me-2"></i>You have <strong>Super Admin</strong> privileges. You can edit all employee details and manage user accounts.
+                            <i class="fas fa-crown me-2"></i>You have <strong>Super Admin</strong> privileges. You can edit all employee details including photo.
                         </div>
                     {% elif user_role == 'admin' %}
                         <div class="alert alert-warning">
@@ -34,7 +34,7 @@
                         </div>
                     {% endif %}
 
-                    <form method="POST" id="editEmployeeForm">
+                    <form method="POST" id="editEmployeeForm" enctype="multipart/form-data">
                         <!-- Hidden field for user action -->
                         <input type="hidden" name="user_action" id="user_action" value="">
 
@@ -120,164 +120,85 @@
                             </div>
                         </div>
 
-                        <!-- User Account Section (Only for Super Admin) -->
-                        {% if user_role == 'superadmin' %}
-                        <div class="card mb-4 border-info">
-                            <div class="card-header bg-info text-white">
+                        <!-- Registered Image Section with Upload -->
+                        <div class="card mb-4 border-primary">
+                            <div class="card-header bg-primary text-white">
                                 <h5 class="mb-0">
-                                    <i class="fas fa-user-circle me-2"></i>User Account (Login Credentials)
+                                    <i class="fas fa-camera me-2"></i>Employee Photo
                                 </h5>
                             </div>
                             <div class="card-body">
-                                {% if has_user_account %}
-                                    <div class="alert alert-success">
-                                        <i class="fas fa-check-circle me-2"></i>
-                                        <strong>User account exists:</strong> {{ emp.email }}
-                                        <span class="badge bg-secondary ms-2">System Role: {{ user.role if user else 'user' }}</span>
-                                    </div>
-                                    
-                                    <div class="row">
-                                        <div class="col-md-6 mb-3">
-                                            <label for="new_password" class="form-label">
-                                                <i class="fas fa-key me-1"></i>New Password
-                                            </label>
-                                            <div class="input-group">
-                                                <input type="password" class="form-control" id="new_password" 
-                                                       name="new_password" placeholder="Enter new password">
-                                                <button class="btn btn-outline-secondary" type="button" onclick="togglePassword('new_password')">
-                                                    <i class="fas fa-eye" id="toggleNewPasswordIcon"></i>
-                                                </button>
-                                            </div>
-                                            <small class="text-muted">Leave blank to keep current password</small>
-                                        </div>
-                                        <div class="col-md-6 mb-3">
-                                            <label for="confirm_password" class="form-label">
-                                                <i class="fas fa-lock me-1"></i>Confirm Password
-                                            </label>
-                                            <div class="input-group">
-                                                <input type="password" class="form-control" id="confirm_password" 
-                                                       name="confirm_password" placeholder="Confirm new password">
-                                                <button class="btn btn-outline-secondary" type="button" onclick="togglePassword('confirm_password')">
-                                                    <i class="fas fa-eye" id="toggleConfirmPasswordIcon"></i>
-                                                </button>
-                                            </div>
+                                <div class="row">
+                                    <div class="col-md-6 text-center">
+                                        <label class="form-label">Current Photo</label>
+                                        <div class="mb-2">
+                                            {% if emp.registered_image %}
+                                                <img src="{{ url_for('uploads', filename=emp.registered_image) }}" 
+                                                     id="currentImage" 
+                                                     class="img-thumbnail rounded-circle" 
+                                                     style="width: 150px; height: 150px; object-fit: cover;"
+                                                     alt="Employee Image">
+                                                <br>
+                                                <small class="text-muted">Current photo</small>
+                                            {% else %}
+                                                <div class="bg-secondary text-white rounded-circle d-inline-flex align-items-center justify-content-center" 
+                                                     style="width: 150px; height: 150px;">
+                                                    <i class="fas fa-user fa-4x"></i>
+                                                </div>
+                                                <br>
+                                                <small class="text-muted">No photo uploaded</small>
+                                            {% endif %}
                                         </div>
                                     </div>
                                     
-                                    <div class="password-requirements mt-2 mb-3" id="passwordRequirements" style="display: none;">
-                                        <small class="text-muted">Password must contain:</small>
-                                        <ul class="list-unstyled mt-1">
-                                            <li id="reqLength" class="text-danger">
-                                                <i class="fas fa-times-circle me-1"></i>At least 8 characters
-                                            </li>
-                                            <li id="reqUpper" class="text-danger">
-                                                <i class="fas fa-times-circle me-1"></i>One uppercase letter
-                                            </li>
-                                            <li id="reqLower" class="text-danger">
-                                                <i class="fas fa-times-circle me-1"></i>One lowercase letter
-                                            </li>
-                                            <li id="reqNumber" class="text-danger">
-                                                <i class="fas fa-times-circle me-1"></i>One number
-                                            </li>
-                                            <li id="reqSpecial" class="text-danger">
-                                                <i class="fas fa-times-circle me-1"></i>One special character (!@#$%^&*)
-                                            </li>
-                                        </ul>
-                                    </div>
-                                    
-                                    <div class="d-flex gap-2">
-                                        <button type="button" class="btn btn-warning" onclick="setUserAction('update_password')">
-                                            <i class="fas fa-key me-2"></i>Update Password
-                                        </button>
-                                        <button type="button" class="btn btn-danger" onclick="confirmRemoveUser()">
-                                            <i class="fas fa-user-slash me-2"></i>Remove User Access
-                                        </button>
-                                    </div>
-                                    
-                                {% else %}
-                                    <div class="alert alert-warning">
-                                        <i class="fas fa-exclamation-triangle me-2"></i>
-                                        <strong>No user account exists for this employee.</strong> 
-                                        Create one to allow them to log into the system.
-                                    </div>
-                                    
-                                    <div class="row">
-                                        <div class="col-md-6 mb-3">
-                                            <label for="new_password" class="form-label">
-                                                <i class="fas fa-key me-1"></i>Password <span class="text-danger">*</span>
-                                            </label>
-                                            <div class="input-group">
-                                                <input type="password" class="form-control" id="new_password" 
-                                                       name="new_password" placeholder="Enter password" required>
-                                                <button class="btn btn-outline-secondary" type="button" onclick="togglePassword('new_password')">
-                                                    <i class="fas fa-eye" id="toggleNewPasswordIcon"></i>
-                                                </button>
+                                    <div class="col-md-6">
+                                        <label for="employee_image" class="form-label">Upload New Photo</label>
+                                        <input type="file" class="form-control" id="employee_image" name="employee_image" 
+                                               accept="image/jpeg,image/png,image/jpg"
+                                               {% if user_role == 'superadmin' %}onchange="previewImage(this)"{% else %}disabled{% endif %}>
+                                        <small class="text-muted">Accepted formats: JPG, JPEG, PNG. Max size: 5MB</small>
+                                        
+                                        <div class="mt-3" id="imagePreview" style="display: none;">
+                                            <label class="form-label">New Photo Preview</label>
+                                            <div>
+                                                <img id="previewImg" class="img-thumbnail rounded-circle" 
+                                                     style="width: 100px; height: 100px; object-fit: cover;">
                                             </div>
                                         </div>
-                                        <div class="col-md-6 mb-3">
-                                            <label for="confirm_password" class="form-label">
-                                                <i class="fas fa-lock me-1"></i>Confirm Password <span class="text-danger">*</span>
-                                            </label>
-                                            <div class="input-group">
-                                                <input type="password" class="form-control" id="confirm_password" 
-                                                       name="confirm_password" placeholder="Confirm password" required>
-                                                <button class="btn btn-outline-secondary" type="button" onclick="togglePassword('confirm_password')">
-                                                    <i class="fas fa-eye" id="toggleConfirmPasswordIcon"></i>
-                                                </button>
+                                        
+                                        {% if emp.registered_image and user_role == 'superadmin' %}
+                                        <div class="mt-2">
+                                            <div class="form-check">
+                                                <input class="form-check-input" type="checkbox" id="remove_image" name="remove_image">
+                                                <label class="form-check-label text-danger" for="remove_image">
+                                                    <i class="fas fa-trash me-1"></i>Remove current photo
+                                                </label>
                                             </div>
                                         </div>
-                                    </div>
-                                    
-                                    <div class="password-requirements mt-2 mb-3" id="passwordRequirements" style="display: block;">
-                                        <small class="text-muted">Password must contain:</small>
-                                        <ul class="list-unstyled mt-1">
-                                            <li id="reqLength" class="text-danger">
-                                                <i class="fas fa-times-circle me-1"></i>At least 8 characters
-                                            </li>
-                                            <li id="reqUpper" class="text-danger">
-                                                <i class="fas fa-times-circle me-1"></i>One uppercase letter
-                                            </li>
-                                            <li id="reqLower" class="text-danger">
-                                                <i class="fas fa-times-circle me-1"></i>One lowercase letter
-                                            </li>
-                                            <li id="reqNumber" class="text-danger">
-                                                <i class="fas fa-times-circle me-1"></i>One number
-                                            </li>
-                                            <li id="reqSpecial" class="text-danger">
-                                                <i class="fas fa-times-circle me-1"></i>One special character (!@#$%^&*)
-                                            </li>
-                                        </ul>
-                                    </div>
-                                    
-                                    <div class="alert alert-info mt-2">
-                                        <i class="fas fa-info-circle me-2"></i>
-                                        <small>The user account will be created with the email address: <strong id="displayEmail">{{ emp.email or 'Not set' }}</strong></small>
-                                        {% if not emp.email %}
-                                        <br><span class="text-danger mt-1 d-block">⚠️ Please set an email address first</span>
+                                        {% endif %}
+                                        
+                                        {% if user_role != 'superadmin' %}
+                                        <small class="text-muted mt-2 d-block">Only Super Admin can change photo</small>
                                         {% endif %}
                                     </div>
-                                    
-                                    <button type="button" class="btn btn-success" onclick="setUserAction('create')" {% if not emp.email %}disabled{% endif %}>
-                                        <i class="fas fa-user-plus me-2"></i>Create User Account
-                                    </button>
+                                </div>
+                                
+                                {% if emp.registered_face_quality and emp.registered_face_quality > 0 %}
+                                <div class="mt-3">
+                                    <label class="form-label">Face Quality Score</label>
+                                    <div class="progress" style="height: 25px;">
+                                        <div class="progress-bar {% if emp.registered_face_quality > 0.7 %}bg-success
+                                            {% elif emp.registered_face_quality > 0.4 %}bg-warning
+                                            {% else %}bg-danger{% endif %}" 
+                                            style="width: {{ emp.registered_face_quality * 100 }}%">
+                                            {{ (emp.registered_face_quality * 100)|round }}%
+                                        </div>
+                                    </div>
+                                    <small class="text-muted">Higher quality photos improve face recognition accuracy</small>
+                                </div>
                                 {% endif %}
                             </div>
                         </div>
-                        {% endif %}
-
-                        <!-- Registered Image Preview -->
-                        {% if emp.registered_image %}
-                        <div class="row mb-3">
-                            <div class="col-12">
-                                <label class="form-label">Registered Image</label>
-                                <div>
-                                    <img src="{{ url_for('uploads', filename=emp.registered_image) }}" 
-                                         height="100" class="rounded border" alt="Employee Image"
-                                         onerror="this.onerror=null; this.src='https://via.placeholder.com/100?text=No+Image';">
-                                </div>
-                            </div>
-                        </div>
-                        {% endif %}
 
                         <!-- Metadata -->
                         <div class="row mb-4">
@@ -286,6 +207,13 @@
                                     <i class="fas fa-calendar-alt me-1"></i>Created: {{ emp.created_at.strftime('%Y-%m-%d %H:%M') if emp.created_at else 'N/A' }}
                                 </small>
                             </div>
+                            {% if emp.registered_image %}
+                            <div class="col-md-6">
+                                <small class="text-muted">
+                                    <i class="fas fa-camera me-1"></i>Photo last updated: {{ emp.updated_at.strftime('%Y-%m-%d %H:%M') if emp.updated_at else 'N/A' }}
+                                </small>
+                            </div>
+                            {% endif %}
                         </div>
 
                         <hr>
@@ -295,7 +223,7 @@
                                 <button type="submit" class="btn btn-primary" id="submitBtn">
                                     <i class="fas fa-save me-2"></i>Save Changes
                                 </button>
-                                <button type="reset" class="btn btn-warning">
+                                <button type="reset" class="btn btn-warning" onclick="resetForm()">
                                     <i class="fas fa-undo me-2"></i>Reset
                                 </button>
                             {% endif %}
@@ -329,9 +257,6 @@
             <div class="modal-body">
                 <p>Are you sure you want to delete <strong>{{ emp.name }}</strong>?</p>
                 <p class="text-danger"><small>This action cannot be undone. All timesheet records for this employee will also be deleted.</small></p>
-                {% if has_user_account %}
-                <p class="text-warning"><i class="fas fa-exclamation-triangle me-2"></i>This employee has a user account that will also be deleted.</p>
-                {% endif %}
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
@@ -341,58 +266,11 @@
     </div>
 </div>
 
-<!-- Remove User Access Modal -->
-<div class="modal fade" id="removeUserModal" tabindex="-1">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <div class="modal-header bg-warning">
-                <h5 class="modal-title">
-                    <i class="fas fa-exclamation-triangle me-2"></i>Remove User Access
-                </h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-            </div>
-            <div class="modal-body">
-                <p>Are you sure you want to remove user access for <strong>{{ emp.name }}</strong>?</p>
-                <p class="text-warning">This will delete their user account. They will no longer be able to log in.</p>
-                <p><small>The employee record and attendance history will be preserved.</small></p>
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                <button type="button" class="btn btn-warning" id="confirmRemoveUserBtn">Remove Access</button>
-            </div>
-        </div>
-    </div>
-</div>
-
 <script>
 let deleteModal;
-let removeUserModal;
 
 document.addEventListener('DOMContentLoaded', function() {
     deleteModal = new bootstrap.Modal(document.getElementById('deleteModal'));
-    removeUserModal = new bootstrap.Modal(document.getElementById('removeUserModal'));
-    
-    // Add password strength checker
-    const newPassword = document.getElementById('new_password');
-    if (newPassword) {
-        newPassword.addEventListener('input', checkPasswordStrength);
-    }
-    
-    const confirmPassword = document.getElementById('confirm_password');
-    if (confirmPassword) {
-        confirmPassword.addEventListener('input', checkPasswordMatch);
-    }
-    
-    // Update display email when email field changes
-    const emailField = document.getElementById('email');
-    if (emailField) {
-        emailField.addEventListener('input', function() {
-            const displayEmail = document.getElementById('displayEmail');
-            if (displayEmail) {
-                displayEmail.textContent = this.value || 'Not set';
-            }
-        });
-    }
     
     // Validate form before submit
     document.getElementById('editEmployeeForm').addEventListener('submit', function(e) {
@@ -402,161 +280,40 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 });
 
-// Toggle password visibility
-function togglePassword(fieldId) {
-    const field = document.getElementById(fieldId);
-    const icon = document.getElementById(`toggle${fieldId.charAt(0).toUpperCase() + fieldId.slice(1)}Icon`);
+// Preview image before upload
+function previewImage(input) {
+    const preview = document.getElementById('imagePreview');
+    const previewImg = document.getElementById('previewImg');
     
-    if (field.type === 'password') {
-        field.type = 'text';
-        icon.classList.remove('fa-eye');
-        icon.classList.add('fa-eye-slash');
-    } else {
-        field.type = 'password';
-        icon.classList.remove('fa-eye-slash');
-        icon.classList.add('fa-eye');
-    }
-}
-
-// Set user action
-function setUserAction(action) {
-    document.getElementById('user_action').value = action;
-}
-
-// Check password strength
-function checkPasswordStrength() {
-    const password = document.getElementById('new_password').value;
-    const requirements = document.getElementById('passwordRequirements');
-    
-    if (requirements) {
-        if (password.length > 0) {
-            requirements.style.display = 'block';
-            
-            // Check length
-            const lengthValid = password.length >= 8;
-            updateRequirement('reqLength', lengthValid);
-            
-            // Check uppercase
-            const upperValid = /[A-Z]/.test(password);
-            updateRequirement('reqUpper', upperValid);
-            
-            // Check lowercase
-            const lowerValid = /[a-z]/.test(password);
-            updateRequirement('reqLower', lowerValid);
-            
-            // Check number
-            const numberValid = /[0-9]/.test(password);
-            updateRequirement('reqNumber', numberValid);
-            
-            // Check special character
-            const specialValid = /[!@#$%^&*(),.?":{}|<>]/.test(password);
-            updateRequirement('reqSpecial', specialValid);
-        } else {
-            requirements.style.display = 'none';
-        }
-    }
-    
-    checkPasswordMatch();
-}
-
-function updateRequirement(elementId, isValid) {
-    const element = document.getElementById(elementId);
-    if (element) {
-        const icon = element.querySelector('i');
-        if (isValid) {
-            element.classList.remove('text-danger');
-            element.classList.add('text-success');
-            icon.classList.remove('fa-times-circle');
-            icon.classList.add('fa-check-circle');
-        } else {
-            element.classList.remove('text-success');
-            element.classList.add('text-danger');
-            icon.classList.remove('fa-check-circle');
-            icon.classList.add('fa-times-circle');
-        }
-    }
-}
-
-// Check password match
-function checkPasswordMatch() {
-    const password = document.getElementById('new_password');
-    const confirm = document.getElementById('confirm_password');
-    
-    if (!password || !confirm) return true;
-    
-    if (confirm.value.length > 0 && password.value !== confirm.value) {
-        confirm.classList.add('is-invalid');
-        return false;
-    } else {
-        confirm.classList.remove('is-invalid');
-        return true;
-    }
-}
-
-// Form validation before submit
-function validateForm() {
-    const userAction = document.getElementById('user_action').value;
-    const password = document.getElementById('new_password');
-    const confirm = document.getElementById('confirm_password');
-    
-    // If creating a new user account
-    if (userAction === 'create') {
-        if (!password || !password.value) {
-            alert('Password is required to create a user account');
-            return false;
-        }
+    if (input.files && input.files[0]) {
+        const reader = new FileReader();
         
-        if (password.value !== confirm.value) {
-            alert('Passwords do not match');
-            return false;
-        }
-        
-        // Check password strength
-        const pwd = password.value;
-        const requirements = {
-            length: pwd.length >= 8,
-            upper: /[A-Z]/.test(pwd),
-            lower: /[a-z]/.test(pwd),
-            number: /[0-9]/.test(pwd),
-            special: /[!@#$%^&*(),.?":{}|<>]/.test(pwd)
+        reader.onload = function(e) {
+            previewImg.src = e.target.result;
+            preview.style.display = 'block';
         };
         
-        if (!requirements.length || !requirements.upper || !requirements.lower || 
-            !requirements.number || !requirements.special) {
-            alert('Password must contain:\n' +
-                  '- At least 8 characters\n' +
-                  '- One uppercase letter\n' +
-                  '- One lowercase letter\n' +
-                  '- One number\n' +
-                  '- One special character (!@#$%^&*)');
-            return false;
-        }
+        reader.readAsDataURL(input.files[0]);
+    } else {
+        preview.style.display = 'none';
     }
-    
-    // If updating password
-    if (userAction === 'update_password') {
-        if (!password || !password.value) {
-            alert('Please enter a new password');
-            return false;
-        }
-        
-        if (password.value !== confirm.value) {
-            alert('Passwords do not match');
-            return false;
-        }
-    }
-    
-    return true;
 }
 
-// Confirm remove user access
-function confirmRemoveUser() {
-    removeUserModal.show();
-    
-    document.getElementById('confirmRemoveUserBtn').onclick = function() {
-        document.getElementById('user_action').value = 'remove_user';
-        document.getElementById('editEmployeeForm').submit();
-    };
+// Reset form
+function resetForm() {
+    document.getElementById('editEmployeeForm').reset();
+    document.getElementById('imagePreview').style.display = 'none';
+    document.getElementById('previewImg').src = '';
+}
+
+// Form validation
+function validateForm() {
+    const name = document.getElementById('name').value;
+    if (!name || name.trim() === '') {
+        alert('Employee name is required');
+        return false;
+    }
+    return true;
 }
 
 // Delete employee function
@@ -624,31 +381,12 @@ setTimeout(function() {
     background-color: #d4edda;
     border-left: 4px solid #28a745;
 }
-.password-requirements {
-    background-color: #f8f9fa;
-    border-radius: 8px;
-    padding: 10px;
-    font-size: 0.9rem;
+.img-thumbnail {
+    border-radius: 50%;
+    object-fit: cover;
 }
-.password-requirements ul {
-    margin-bottom: 0;
-}
-.password-requirements li {
-    transition: all 0.3s;
-}
-.text-success i, .text-danger i {
-    margin-right: 8px;
-    width: 16px;
-}
-.input-group .btn {
-    padding: 6px 12px;
-}
-.border-info {
-    border-color: #17a2b8 !important;
-}
-.badge {
-    font-size: 0.8rem;
-    padding: 0.4rem 0.6rem;
+#imagePreview {
+    margin-top: 10px;
 }
 </style>
 {% endblock %}

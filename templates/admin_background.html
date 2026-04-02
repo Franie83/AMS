@@ -1,0 +1,146 @@
+{% extends "layout.html" %}
+{% block body %}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header bg-primary text-white">
+                    <h4 class="mb-0">
+                        <i class="fas fa-image me-2"></i>Background Settings
+                    </h4>
+                </div>
+                <div class="card-body">
+                    {% with messages = get_flashed_messages(with_categories=true) %}
+                        {% if messages %}
+                            {% for category, message in messages %}
+                                <div class="alert alert-{{ category }} alert-dismissible fade show" role="alert">
+                                    {{ message }}
+                                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                                </div>
+                            {% endfor %}
+                        {% endif %}
+                    {% endwith %}
+
+                    <div class="row">
+                        <div class="col-md-6">
+                            <form method="POST" enctype="multipart/form-data">
+                                <h5><i class="fas fa-upload me-2"></i>Upload New Background</h5>
+                                <div class="mb-3">
+                                    <label class="form-label">Choose Image</label>
+                                    <input type="file" class="form-control" name="background_image" accept="image/jpeg,image/png,image/gif,image/webp">
+                                    <small class="text-muted">Supported formats: JPG, PNG, GIF, WEBP. Recommended size: 1920x1080px</small>
+                                </div>
+                                
+                                <h5 class="mt-4"><i class="fas fa-sliders-h me-2"></i>Background Style</h5>
+                                <div class="row mb-3">
+                                    <div class="col-md-6">
+                                        <label class="form-label">Style</label>
+                                        <select class="form-select" name="background_style">
+                                            <option value="cover" {% if current_style == 'cover' %}selected{% endif %}>Cover (Full screen)</option>
+                                            <option value="contain" {% if current_style == 'contain' %}selected{% endif %}>Contain</option>
+                                            <option value="auto" {% if current_style == 'auto' %}selected{% endif %}>Auto</option>
+                                            <option value="repeat" {% if current_style == 'repeat' %}selected{% endif %}>Repeat</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label">Position</label>
+                                        <select class="form-select" name="background_position">
+                                            <option value="center" {% if current_position == 'center' %}selected{% endif %}>Center</option>
+                                            <option value="top" {% if current_position == 'top' %}selected{% endif %}>Top</option>
+                                            <option value="bottom" {% if current_position == 'bottom' %}selected{% endif %}>Bottom</option>
+                                            <option value="left" {% if current_position == 'left' %}selected{% endif %}>Left</option>
+                                            <option value="right" {% if current_position == 'right' %}selected{% endif %}>Right</option>
+                                        </select>
+                                    </div>
+                                </div>
+                                
+                                <div class="row mb-3">
+                                    <div class="col-md-6">
+                                        <label class="form-label">Attachment</label>
+                                        <select class="form-select" name="background_attachment">
+                                            <option value="fixed" {% if current_attachment == 'fixed' %}selected{% endif %}>Fixed (Parallax)</option>
+                                            <option value="scroll" {% if current_attachment == 'scroll' %}selected{% endif %}>Scroll</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label">Background Color (fallback)</label>
+                                        <input type="color" class="form-control" name="background_color" value="{{ current_color }}" style="height: 45px;">
+                                    </div>
+                                </div>
+                                
+                                <button type="submit" class="btn btn-primary btn-lg w-100 mt-3">
+                                    <i class="fas fa-save me-2"></i>Save Settings
+                                </button>
+                            </form>
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <h5><i class="fas fa-images me-2"></i>Current Background</h5>
+                            {% if current_bg %}
+                            <div class="card mb-3">
+                                <img src="{{ url_for('uploads', filename='backgrounds/' + current_bg) }}" class="card-img-top" style="max-height: 200px; object-fit: cover;" alt="Current Background">
+                                <div class="card-body">
+                                    <p class="card-text">Current background: {{ current_bg }}</p>
+                                    <a href="{{ url_for('admin_background_delete', filename=current_bg) }}" class="btn btn-sm btn-danger" onclick="return confirm('Delete current background?')">
+                                        <i class="fas fa-trash me-1"></i>Delete
+                                    </a>
+                                </div>
+                            </div>
+                            {% else %}
+                            <div class="alert alert-info">
+                                <i class="fas fa-info-circle me-2"></i>
+                                No background image set. Using default background color.
+                            </div>
+                            {% endif %}
+                            
+                            <h5 class="mt-4"><i class="fas fa-history me-2"></i>Background Library</h5>
+                            {% if available_bgs %}
+                            <div class="row">
+                                {% for bg in available_bgs %}
+                                <div class="col-6 mb-2">
+                                    <div class="card bg-light">
+                                        <img src="{{ url_for('uploads', filename='backgrounds/' + bg) }}" class="card-img-top" style="height: 80px; object-fit: cover;" alt="{{ bg }}">
+                                        <div class="card-body p-2">
+                                            <small class="d-block text-truncate">{{ bg|truncate(20) }}</small>
+                                            <form method="POST" action="{{ url_for('admin_background') }}" class="mt-1">
+                                                <button type="submit" class="btn btn-sm btn-primary w-100" name="use_existing" value="{{ bg }}">
+                                                    <i class="fas fa-check me-1"></i>Use
+                                                </button>
+                                            </form>
+                                        </div>
+                                    </div>
+                                </div>
+                                {% endfor %}
+                            </div>
+                            {% else %}
+                            <p class="text-muted">No background images in library. Upload your first image above.</p>
+                            {% endif %}
+                        </div>
+                    </div>
+                    
+                    <hr class="my-4">
+                    
+                    <div class="row">
+                        <div class="col-12">
+                            <h5><i class="fas fa-eye me-2"></i>Preview</h5>
+                            <div class="preview-box" style="height: 200px; background: {{ current_color }}; background-image: {% if current_bg %}url('{{ url_for('uploads', filename='backgrounds/' + current_bg) }}'){% endif %}; background-size: {{ current_style }}; background-position: {{ current_position }}; background-attachment: {{ current_attachment }}; border-radius: 10px; border: 2px solid #dee2e6;">
+                                <div class="d-flex align-items-center justify-content-center h-100">
+                                    <div class="bg-dark bg-opacity-50 text-white p-3 rounded">
+                                        <i class="fas fa-image me-2"></i>Preview Area
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+.preview-box {
+    transition: all 0.3s ease;
+}
+</style>
+{% endblock %}

@@ -1,0 +1,37 @@
+{% extends "layout.html" %}
+{% block body %}
+<div class="container mt-5">
+    <div class="row justify-content-center">
+        <div class="col-md-6">
+            <div class="card border-danger">
+                <div class="card-header bg-danger text-white">
+                    <h4 class="mb-0">⚠️ License Required</h4>
+                </div>
+                <div class="card-body">
+                    <div class="alert alert-warning">
+                        <strong>This software requires a valid license.</strong>
+                    </div>
+                    <p>Please contact your administrator to obtain a license.</p>
+                    <div class="card bg-light mt-3">
+                        <div class="card-body">
+                            <h6>Hardware Fingerprint:</h6>
+                            <code class="small">{{ fingerprint }}</code>
+                            <button class="btn btn-sm btn-secondary mt-2" onclick="copyFingerprint()">Copy Fingerprint</button>
+                        </div>
+                    </div>
+                    <div class="mt-4">
+                        <a href="{{ url_for('login') }}" class="btn btn-primary">Back to Login</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+<script>
+function copyFingerprint() {
+    const fingerprint = "{{ fingerprint }}";
+    navigator.clipboard.writeText(fingerprint);
+    alert("Fingerprint copied to clipboard!");
+}
+</script>
+{% endblock %}
