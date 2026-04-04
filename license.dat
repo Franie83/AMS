@@ -1,8 +1,8 @@
 {
   "hardware_fingerprint": "6cb7eca07060314e82d15aa2141b36f3204d93074d5f9837ac630cf49d010e34",
   "customer": "Customer",
-  "issued": "2026-04-02 16:22:08",
-  "expiry": "2026-04-03",
+  "issued": "2026-04-04 20:11:21",
+  "expiry": "2026-04-05",
   "version": "1.0",
-  "signature": "a6a71bc7d2218ff6e6ddd535b233a7ca11210598cbcbea445a8be8d7df47ddc5"
+  "signature": "8185653a1e31756e5801bb92eebd329014939efda78877002900647e62dd8660"
 }
